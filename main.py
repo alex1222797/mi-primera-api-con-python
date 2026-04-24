@@ -1,6 +1,7 @@
 from fastapi import FastAPI #esto sirve para importar la libreria de FastAPI es mi framework
 from databaseQR import conectar #de otro archivo .py traigo una funcion
 import pymysql
+import os
 from fastapi.responses import HTMLResponse #devolvere  html no json
 
 
