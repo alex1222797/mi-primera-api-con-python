@@ -1,4 +1,4 @@
-\import pymysql
+import pymysql
 import os # Importante para leer las variables de Render
 
 def conectar():
