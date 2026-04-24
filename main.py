@@ -21,7 +21,7 @@ def ficha_qr(id: str):
                 f.Tipo_Sangre,
                 f.Alergias,
                 f.Observaciones
-            FROM FICHAS_MEDICAS f
+            FROM fichas_medicas f
             JOIN PERSONAS p ON f.ID_Persona = p.ID_Personas
             WHERE f.ID_Ficha = %s
         """
