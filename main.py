@@ -22,7 +22,7 @@ def ficha_qr(id: str):
                 f.Alergias,
                 f.Observaciones
             FROM fichas_medicas f
-            JOIN PERSONAS p ON f.ID_Persona = p.ID_Personas
+            JOIN personas p ON f.ID_Persona = p.ID_Personas
             WHERE f.ID_Ficha = %s
         """
         
