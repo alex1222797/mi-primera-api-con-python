@@ -105,17 +105,20 @@ def descargar_factura(clave: str, nombre: str = "Cliente", total: str = "0.00", 
         pdf.set_text_color(198, 40, 40)
         pdf.cell(190, 15, clave, ln=True, align="C")
 
-        # --- EL PARCHE DEFINITIVO ---
+     # --- EL PARCHE DEFINITIVO (SIN .ENCODE) ---
         output = pdf.output(dest='S')
-        # Si ya son bytes (tu caso), se mandan directo. Si es texto, se encodea.
-        final_payload = output.encode('latin-1') if isinstance(output, str) else output
+        
+        # Convertimos a bytes puro, sin importar si viene como string o bytearray
+        if isinstance(output, str):
+            final_payload = bytes(output, 'latin-1')
+        else:
+            final_payload = bytes(output) # Esto convierte bytearray a bytes limpios
 
         return Response(
-            content=output, 
+            content=final_payload,
             media_type="application/pdf",
             headers={"Content-Disposition": f"attachment; filename=Factura_{clave}.pdf"}
         )
-
     except Exception as e:
         return {"status": "error", "message": str(e)}
 # --- RUTAS DEL APP / QR ---
