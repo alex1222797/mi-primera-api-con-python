@@ -54,69 +54,68 @@ def descargar_factura(clave: str):
         if not v:
             return {"status": "error", "message": "Venta no encontrada"}
 
-        # Crear el PDF con el formato solicitado 
         pdf = FPDF()
         pdf.add_page()
         
-        # --- ENCABEZADO PROFESIONAL ---
+        # --- ENCABEZADO ---
         pdf.set_font("Arial", "B", 16)
-        pdf.cell(190, 10, "DiagnosticoMedQR", ln=True, align="L") # [cite: 1]
+        pdf.cell(190, 10, "DiagnosticoMedQR", ln=True, align="L")
         pdf.set_font("Arial", "", 12)
-        pdf.cell(190, 8, "Comprobante de Compra Electronico", ln=True, align="L") # [cite: 2]
+        pdf.cell(190, 8, "Comprobante de Compra Electronico", ln=True, align="L")
         pdf.ln(5)
         pdf.line(10, 35, 200, 35)
         
         # --- DATOS DEL CLIENTE ---
         pdf.ln(10)
         pdf.set_font("Arial", "B", 12)
-        pdf.cell(190, 10, "DATOS DEL CLIENTE", ln=True) # [cite: 3]
+        pdf.cell(190, 10, "DATOS DEL CLIENTE", ln=True)
         pdf.set_font("Arial", "", 11)
-        pdf.cell(190, 7, f"Nombre: {v['Nombre_Cliente']}", ln=True) # [cite: 4]
-        pdf.cell(190, 7, f"Email: {v['Email_Cliente']}", ln=True) # [cite: 5]
-        pdf.cell(190, 7, f"Fecha: 5/8/2026", ln=True) # [cite: 6]
+        pdf.cell(190, 7, f"Nombre: {v['Nombre_Cliente']}", ln=True)
+        pdf.cell(190, 7, f"Email: {v['Email_Cliente']}", ln=True)
+        pdf.cell(190, 7, "Fecha: 5/8/2026", ln=True)
         
         # --- TABLA DE PRODUCTOS ---
         pdf.ln(10)
         pdf.set_fill_color(240, 240, 240)
         pdf.set_font("Arial", "B", 11)
-        pdf.cell(140, 10, " Producto", border=1, fill=True) # [cite: 7]
-        pdf.cell(50, 10, " Precio", border=1, fill=True, ln=True) # [cite: 7]
+        pdf.cell(140, 10, " Producto", border=1, fill=True)
+        pdf.cell(50, 10, " Precio", border=1, fill=True, ln=True)
         
         pdf.set_font("Arial", "", 11)
-        # Limpieza básica del detalle para evitar errores de caracteres
-        detalle_texto = v['Detalle'].replace('|', '-').strip()
-        pdf.cell(140, 10, f" {detalle_texto}", border=1)
-        pdf.cell(50, 10, f" ${v['Total']}.00", border=1, ln=True) # [cite: 7]
+        detalle_limpio = v['Detalle'].replace('|', '-').strip()
+        pdf.cell(140, 10, f" {detalle_limpio}", border=1)
+        pdf.cell(50, 10, f" ${v['Total']}.00", border=1, ln=True)
         
         pdf.set_font("Arial", "B", 11)
         pdf.cell(140, 10, " TOTAL PAGADO:", border=1, align="R")
-        pdf.cell(50, 10, f" ${v['Total']}.00", border=1, ln=True) # [cite: 7]
+        pdf.cell(50, 10, f" ${v['Total']}.00", border=1, ln=True)
         
         # --- CLAVE DE ACTIVACIÓN ---
         pdf.ln(15)
         pdf.set_font("Arial", "B", 12)
-        pdf.cell(190, 10, "TU CLAVE DE ACTIVACION PARA LA APP:", ln=True, align="C") # [cite: 8]
+        pdf.cell(190, 10, "TU CLAVE DE ACTIVACION PARA LA APP:", ln=True, align="C")
         pdf.set_font("Arial", "B", 24)
-        pdf.set_text_color(198, 40, 40) # Color rojo corporativo
-        pdf.cell(190, 20, v['Clave_Generada'], ln=True, align="C") # [cite: 9]
+        pdf.set_text_color(198, 40, 40)
+        pdf.cell(190, 20, str(v['Clave_Generada']), ln=True, align="C")
         
         pdf.set_text_color(0, 0, 0)
         pdf.ln(5)
         pdf.set_font("Arial", "I", 10)
-        pdf.multi_cell(190, 8, "Use esta clave en nuestra App oficial para configurar su pulsera medica.", align="C") # [cite: 10]
+        pdf.multi_cell(190, 8, "Use esta clave en nuestra App oficial para configurar su pulsera medica.", align="C")
 
-        # --- GENERACIÓN FINAL ---
-        # Aseguramos que se genere como bytes sin referencias externas
-        resultado_pdf = pdf.output() 
+        # --- REPARACIÓN DEL ERROR ---
+        # Usamos output() de forma directa para evitar el conflicto de nombres
+        contenido_binario = pdf.output()
         
         return Response(
-            content=resultado_pdf,
+            content=contenido_binario,
             media_type="application/pdf",
-            headers={"Content-Disposition": f"attachment; filename=Factura_{clave}.pdf"}
+            headers={
+                "Content-Disposition": f"attachment; filename=Factura_{clave}.pdf"
+            }
         )
     except Exception as e:
-        # Esto te dirá exactamente qué falla si ocurre algo nuevo
-        return {"status": "error", "message": str(e)}
+        return {"status": "error", "message": f"Fallo en PDF: {str(e)}"}
 # --- RUTAS RESTANTES (LOGIN Y REGISTRO) ---
 
 class ValidarAcceso(BaseModel):
