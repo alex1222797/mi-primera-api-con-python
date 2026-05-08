@@ -8,9 +8,9 @@ from fastapi.middleware.cors import CORSMiddleware
 app = FastAPI()
 app.add_middleware(
     CORSMiddleware,
-    allow_origins["*"], #permite conectarse a cualquier dominio
-    allow_credentials = True,
-    allow_methods=["*"], #permite el get y post
+    allow_origins=["*"], 
+    allow_credentials=True, # Asegúrate de que tenga el signo '='
+    allow_methods=["*"], 
     allow_headers=["*"],
 )
 #--VALIDAR LOS DATOS QUE VIENEN DEL SITIO WEB--
