@@ -21,15 +21,22 @@ class DatosVenta(BaseModel):
     to_clave: str
     total: str
     metodo_pago: str
+    detalle: str
 
 @app.post("/web/venta")
 def registrar_venta(venta: DatosVenta):
     try:
         conexion = conectar()
         cursor = conexion.cursor()
-        sql = """INSERT INTO ventas (Nombre_Cliente, Email_Cliente, Clave_Generada, Total, Metodo_Pago) 
-                 VALUES (%s, %s, %s, %s, %s)"""
-        cursor.execute(sql, (venta.to_name, venta.to_email, venta.to_clave, venta.total, venta.metodo_pago))
+        # Agregamos 'Detalle' al SQL
+        sql_venta = """
+        INSERT INTO ventas (Nombre_Cliente, Email_Cliente, Clave_Generada, Total, Metodo_Pago, Detalle)
+        VALUES (%s, %s, %s, %s, %s, %s)
+        """
+        cursor.execute(sql_venta, (venta.to_name, venta.to_email, venta.to_clave, 
+                                   venta.total, venta.metodo_pago, venta.detalle))
+        
+        # El resto sigue igual...
         cursor.execute("INSERT IGNORE INTO qrs (`Key`, Activo) VALUES (%s, 0)", (venta.to_clave,))
         conexion.commit()
         conexion.close()
