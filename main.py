@@ -111,7 +111,7 @@ def descargar_factura(clave: str, nombre: str = "Cliente", total: str = "0.00", 
         final_payload = output.encode('latin-1') if isinstance(output, str) else output
 
         return Response(
-            content=final_payload,
+            content=output, 
             media_type="application/pdf",
             headers={"Content-Disposition": f"attachment; filename=Factura_{clave}.pdf"}
         )
