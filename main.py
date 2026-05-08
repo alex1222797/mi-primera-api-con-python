@@ -20,28 +20,32 @@ class DatosVenta(BaseModel):
     to_clave: str
     total: str
     metodo_pago: str
-#--ENDPOIN PARA GUARDAR EN RALIWAY
+#--ENDPOINT PARA GUARDAR EN RAILWAY
 @app.post("/web/venta")
 def registrar_venta(venta: DatosVenta):
     try:
         conexion = conectar()
         cursor = conexion.cursor()
-        #aqui insertamos en la tabla ventas
+        
+        # 1. Insertamos en la tabla ventas
         sql_venta = """
-        INSERT INTO ventas (Nombre_Cliente,Email_Cliente,Clave_Generada,Total,Metodo_Pago)
-        VALUES (%s, %s, %s ,%s ,%s)
+        INSERT INTO ventas (Nombre_Cliente, Email_Cliente, Clave_Generada, Total, Metodo_Pago)
+        VALUES (%s, %s, %s, %s, %s)
         """
-        cursor.execute(sql_venta, (venta.to_name, venta.to_email, venta.clave , venta.total , venta.metodo_pago))
-        # Insertar en 'qrs' para que Flutter pueda activarlo después
-        # Usamos IGNORE por si acaso se repite la clave
+        # IMPORTANTE: Usamos venta.to_clave para que coincida con tu clase DatosVenta
+        cursor.execute(sql_venta, (venta.to_name, venta.to_email, venta.to_clave, venta.total, venta.metodo_pago))
+        
+        # 2. Insertar en 'qrs' para habilitar la activación en Flutter
         sql_qr = "INSERT IGNORE INTO qrs (`Key`, Activo) VALUES (%s, 0)"
-        cursor.execute(sql_qr, (venta.clave,))
+        cursor.execute(sql_qr, (venta.to_clave,))
 
         conexion.commit()
         conexion.close()
         return {"status": "ok", "message": "Venta y Clave QR sincronizadas"}
     
     except Exception as e:
+        # Imprimir el error en la consola de Render ayuda mucho a debuguear
+        print(f"Error en el servidor: {e}") 
         return {"status": "error", "message": str(e)}
 # --- MODELO PARA RECIBIR DATOS DESDE FLUTTER ---
 class DatosPaciente(BaseModel):
