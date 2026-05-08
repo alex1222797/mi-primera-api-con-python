@@ -131,9 +131,9 @@ def descargar_factura(clave: str, nombre: str = "Cliente", total: str = "0.00"):
         pdf.set_text_color(150, 150, 150)
         pdf.cell(190, 10, "2026 DiagnosticoMedQR - Tu seguridad, nuestra prioridad.", align="C")
 
-        return Response(content=pdf.output(dest='S').encode('latin-1'),
-                        media_type="application/pdf",
-                        headers={"Content-Disposition": f"attachment; filename=Factura_{clave}.pdf"})
+        return Response(content=pdf.output(dest='S'),  # <--- Quitamos .encode('latin-1')
+    media_type="application/pdf",
+    headers={"Content-Disposition": f"attachment; filename=Factura_{clave}.pdf"})
     except Exception as e:
         return {"status": "error", "message": str(e)}
 # --- RUTAS DEL APP / QR ---
