@@ -78,12 +78,14 @@ def ficha_qr(id: str):
         .title{{text-align:center;font-size:24px;font-weight:bold;margin-bottom:20px;}}
         .info{{margin:15px 0;border-bottom:1px solid #eee;padding-bottom:5px;}}
         .label{{color:#ff4b2b;font-weight:bold;font-size:12px;text-transform:uppercase;display:block;}}
-        .btn{{display:block;padding:15px;margin-top:10px;border-radius:10px;text-decoration:none;color:white;text-align:center;font-weight:bold;background:#d32f2f;}}</style>
+        .btn{{display:block;padding:15px;margin-top:10px;border-radius:10px;text-decoration:none;color:white;text-align:center;font-weight:bold;background:#d32f2f;}}
+         .btn-1{{display:block;padding:15px;margin-top:10px;border-radius:10px;text-decoration:none;color:white;text-align:center;font-weight:bold;background:blue;}}</style>
         </head><body><div class="card"><div class="title">🚑 Ficha Médica</div>
         <div class="info"><span class="label">Nombre</span> {d['Nombre']} {d['Apellido']}</div>
         <div class="info"><span class="label">Sangre</span> {d['Tipo_Sangre']}</div>
         <div class="info"><span class="label">Alergias</span> {d['Alergias']}</div>
         <div class="info"><span class="label">Notas</span> {d['Observaciones']}</div>
-        <a class="btn" href="tel:911">📞 EMERGENCIAS (911)</a></div></body></html>"""
+        <a class="btn" href="tel:911">📞 EMERGENCIAS (911)</a>
+        <a class="btn-1" href="tel:132">📞 SEM (132)</a></div></body></html>"""
     except Exception as e:
         return f"<h1>Error: {str(e)}</h1>"
