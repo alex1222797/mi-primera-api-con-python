@@ -3,8 +3,16 @@ from databaseQR import conectar
 import pymysql
 from pydantic import BaseModel
 from fastapi.responses import HTMLResponse 
+from fastapi.middleware.cors import CORSMiddleware
 
 app = FastAPI()
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins["*"], #permite conectarse a cualquier dominio
+    allow_credentials = True,
+    allow_methods=["*"], #permite el get y post
+    allow_headers=["*"],
+)
 
 # --- MODELO PARA RECIBIR DATOS DESDE FLUTTER ---
 class DatosPaciente(BaseModel):
