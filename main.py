@@ -73,39 +73,64 @@ def descargar_factura(clave: str):
         if not v:
             return {"status": "error", "message": "Venta no encontrada"}
 
-        # Generar PDF
         pdf = FPDF()
         pdf.add_page()
         
-        # Encabezado
-        pdf.set_font("Arial", "B", 20)
-        pdf.set_text_color(211, 47, 47) 
-        pdf.cell(190, 15, "DIAGNOSTICMED - COMPROBANTE", ln=True, align="C")
-        
-        # Datos
+        # ENCABEZADO PROFESIONAL
+        pdf.set_font("Arial", "B", 16)
+        pdf.cell(190, 10, "DiagnosticoMedQR", ln=True, align="L") [cite: 1]
         pdf.set_font("Arial", "", 12)
-        pdf.set_text_color(0, 0, 0)
-        pdf.ln(10)
-        pdf.cell(190, 10, f"Cliente: {v['Nombre_Cliente']}", ln=True)
-        pdf.cell(190, 10, f"Email: {v['Email_Cliente']}", ln=True)
-        pdf.cell(190, 10, f"Metodo de Pago: {v['Metodo_Pago']}", ln=True)
+        pdf.cell(190, 8, "Comprobante de Compra Electrónico", ln=True, align="L") [cite: 2]
         pdf.ln(5)
+        pdf.line(10, 35, 200, 35) # Línea decorativa
+        
+        # DATOS DEL CLIENTE
+        pdf.ln(10)
         pdf.set_font("Arial", "B", 12)
-        pdf.cell(190, 10, f"CLAVE DE ACTIVACION: {v['Clave_Generada']}", ln=True)
-        pdf.ln(5)
-        pdf.set_font("Arial", "", 12)
-        pdf.cell(190, 10, f"Detalle: {v['Detalle']}", ln=True)
-        pdf.set_font("Arial", "B", 14)
-        pdf.cell(190, 15, f"TOTAL: ${v['Total']}", ln=True)
+        pdf.cell(190, 10, "DATOS DEL CLIENTE", ln=True) [cite: 3]
+        pdf.set_font("Arial", "", 11)
+        pdf.cell(190, 7, f"Nombre: {v['Nombre_Cliente']}", ln=True) [cite: 4]
+        pdf.cell(190, 7, f"Email: {v['Email_Cliente']}", ln=True) [cite: 5]
+        # Usamos la fecha actual (8 de mayo de 2026) [cite: 6]
+        pdf.cell(190, 7, f"Fecha: 5/8/2026", ln=True) [cite: 6]
         
+        # TABLA DE PRODUCTOS
         pdf.ln(10)
+        pdf.set_fill_color(240, 240, 240)
+        pdf.set_font("Arial", "B", 11)
+        pdf.cell(140, 10, " Producto", border=1, fill=True) [cite: 7]
+        pdf.cell(50, 10, " Precio", border=1, fill=True, ln=True) [cite: 7]
+        
+        pdf.set_font("Arial", "", 11)
+        # Aquí puedes procesar el detalle si lo tienes separado, o poner el resumen
+        pdf.cell(140, 10, f" {v['Detalle'].split('|')[-1].strip()}", border=1) [cite: 7]
+        pdf.cell(50, 10, f" ${v['Total']}.00", border=1, ln=True) [cite: 7]
+        
+        pdf.set_font("Arial", "B", 11)
+        pdf.cell(140, 10, " TOTAL PAGADO:", border=1, align="R") [cite: 7]
+        pdf.cell(50, 10, f" ${v['Total']}", border=1, ln=True) [cite: 7]
+        
+        # CLAVE DE ACTIVACIÓN (Destacada)
+        pdf.ln(15)
+        pdf.set_fill_color(255, 243, 224) # Color cremita suave
+        pdf.set_font("Arial", "B", 12)
+        pdf.cell(190, 10, "TU CLAVE DE ACTIVACIÓN PARA LA APP:", ln=True, align="C") [cite: 8]
+        pdf.set_font("Arial", "B", 24)
+        pdf.set_text_color(198, 40, 40) # Rojo corporativo
+        pdf.cell(190, 20, v['Clave_Generada'], ln=True, align="C") [cite: 9]
+        
+        pdf.set_text_color(0, 0, 0)
         pdf.set_font("Arial", "I", 10)
-        pdf.multi_cell(190, 10, "Usa esta clave en la App para activar tu servicio.")
+        pdf.multi_cell(190, 8, "Use esta clave en nuestra App oficial para configurar su pulsera médica.", align="C") [cite: 10]
+        
+        pdf.ln(20)
+        pdf.set_font("Arial", "", 9)
+        pdf.cell(190, 10, "2026 DiagnosticoMedQR - Tu seguridad, nuestra prioridad.", align="C")
 
         return Response(
             content=bytes(pdf.output()),
             media_type="application/pdf",
-            headers={"Content-Disposition": f"attachment; filename=Factura_{clave}.pdf"}
+            headers={"Content-Disposition": f"attachment; filename=Factura_MedQR_{v['Nombre_Cliente']}.pdf"}
         )
     except Exception as e:
         return {"status": "error", "message": str(e)}
