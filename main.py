@@ -42,8 +42,9 @@ class ValidarAcceso(BaseModel):
 # --- RUTAS DE LA WEB ---
 
 @app.get("/web/factura/{clave}")
-def descargar_factura(clave: str):
+def descargar_factura(clave: str, nombre: str = "Cliente", total: str = "0.00"):
     try:
+        # Intentamos conectar a Railway
         conexion = conectar()
         cursor = conexion.cursor(pymysql.cursors.DictCursor)
         sql = "SELECT * FROM ventas WHERE Clave_Generada = %s"
@@ -51,14 +52,15 @@ def descargar_factura(clave: str):
         v = cursor.fetchone()
         conexion.close()
 
-        if not v:
-            return {"status": "error", "message": "Venta no encontrada"}
-
-        # Configuración del PDF (Formato DiagnosticoMedQR)
+        # Si Railway ya lo guardó, usamos los datos de la DB
+        # Si aún no aparece, usamos los que mandamos desde la web
+        final_nombre = v['Nombre_Cliente'] if v else nombre
+        final_total = v['Total'] if v else total
+        
         pdf = FPDF()
         pdf.add_page()
         
-        # Encabezado
+        # --- DISEÑO IGUAL AL QUE ME PASASTE ---
         pdf.set_font("Arial", "B", 16)
         pdf.cell(190, 10, "DiagnosticoMedQR", ln=True, align="L")
         pdf.set_font("Arial", "", 12)
@@ -66,53 +68,34 @@ def descargar_factura(clave: str):
         pdf.ln(5)
         pdf.line(10, 35, 200, 35)
         
-        # Datos del Cliente
         pdf.ln(10)
         pdf.set_font("Arial", "B", 12)
         pdf.cell(190, 10, "DATOS DEL CLIENTE", ln=True)
         pdf.set_font("Arial", "", 11)
-        pdf.cell(190, 7, f"Nombre: {v['Nombre_Cliente']}", ln=True)
-        pdf.cell(190, 7, f"Email: {v['Email_Cliente']}", ln=True)
+        pdf.cell(190, 7, f"Nombre: {final_nombre}", ln=True)
         pdf.cell(190, 7, f"Fecha: 5/8/2026", ln=True)
         
-        # Tabla de Productos
         pdf.ln(10)
         pdf.set_fill_color(240, 240, 240)
-        pdf.set_font("Arial", "B", 11)
         pdf.cell(140, 10, " Producto", border=1, fill=True)
         pdf.cell(50, 10, " Precio", border=1, fill=True, ln=True)
         
-        pdf.set_font("Arial", "", 11)
-        # Limpiamos el texto del detalle para el PDF
-        detalle_pdf = str(v['Detalle']).replace('|', '-').strip()
-        pdf.cell(140, 10, f" {detalle_pdf}", border=1)
-        pdf.cell(50, 10, f" ${v['Total']}.00", border=1, ln=True)
+        pdf.cell(140, 10, " Servicio DiagnosticoMedQR", border=1)
+        pdf.cell(50, 10, f" ${final_total}.00", border=1, ln=True)
         
         pdf.set_font("Arial", "B", 11)
         pdf.cell(140, 10, " TOTAL PAGADO:", border=1, align="R")
-        pdf.cell(50, 10, f" ${v['Total']}.00", border=1, ln=True)
+        pdf.cell(50, 10, f" ${final_total}.00", border=1, ln=True)
         
-        # Clave de Activación (Destacada)
         pdf.ln(15)
         pdf.set_font("Arial", "B", 12)
-        pdf.cell(190, 10, "TU CLAVE DE ACTIVACION PARA LA APP:", ln=True, align="C")
-        pdf.set_font("Arial", "B", 24)
+        pdf.cell(190, 10, "TU CLAVE DE ACTIVACION:", ln=True, align="C")
+        pdf.set_font("Arial", "B", 25)
         pdf.set_text_color(198, 40, 40)
-        pdf.cell(190, 20, str(v['Clave_Generada']), ln=True, align="C")
-        
-        pdf.set_text_color(0, 0, 0)
-        pdf.ln(5)
-        pdf.set_font("Arial", "I", 10)
-        pdf.multi_cell(190, 8, "Use esta clave en nuestra App oficial para configurar su pulsera medica.", align="C")
-        
-        pdf.ln(10)
-        pdf.cell(190, 10, "2026 DiagnosticoMedQR - Tu seguridad, nuestra prioridad.", align="C")
-
-        # Generación directa del contenido
-        contenido = pdf.output()
+        pdf.cell(190, 20, clave, ln=True, align="C")
         
         return Response(
-            content=contenido,
+            content=pdf.output(),
             media_type="application/pdf",
             headers={"Content-Disposition": f"attachment; filename=Factura_{clave}.pdf"}
         )
