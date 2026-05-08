@@ -54,10 +54,11 @@ def descargar_factura(clave: str):
         if not v:
             return {"status": "error", "message": "Venta no encontrada"}
 
+        # Configuración del PDF (Formato DiagnosticoMedQR)
         pdf = FPDF()
         pdf.add_page()
         
-        # --- ENCABEZADO ---
+        # Encabezado
         pdf.set_font("Arial", "B", 16)
         pdf.cell(190, 10, "DiagnosticoMedQR", ln=True, align="L")
         pdf.set_font("Arial", "", 12)
@@ -65,16 +66,16 @@ def descargar_factura(clave: str):
         pdf.ln(5)
         pdf.line(10, 35, 200, 35)
         
-        # --- DATOS DEL CLIENTE ---
+        # Datos del Cliente
         pdf.ln(10)
         pdf.set_font("Arial", "B", 12)
         pdf.cell(190, 10, "DATOS DEL CLIENTE", ln=True)
         pdf.set_font("Arial", "", 11)
         pdf.cell(190, 7, f"Nombre: {v['Nombre_Cliente']}", ln=True)
         pdf.cell(190, 7, f"Email: {v['Email_Cliente']}", ln=True)
-        pdf.cell(190, 7, "Fecha: 5/8/2026", ln=True)
+        pdf.cell(190, 7, f"Fecha: 5/8/2026", ln=True)
         
-        # --- TABLA DE PRODUCTOS ---
+        # Tabla de Productos
         pdf.ln(10)
         pdf.set_fill_color(240, 240, 240)
         pdf.set_font("Arial", "B", 11)
@@ -82,15 +83,16 @@ def descargar_factura(clave: str):
         pdf.cell(50, 10, " Precio", border=1, fill=True, ln=True)
         
         pdf.set_font("Arial", "", 11)
-        detalle_limpio = v['Detalle'].replace('|', '-').strip()
-        pdf.cell(140, 10, f" {detalle_limpio}", border=1)
+        # Limpiamos el texto del detalle para el PDF
+        detalle_pdf = str(v['Detalle']).replace('|', '-').strip()
+        pdf.cell(140, 10, f" {detalle_pdf}", border=1)
         pdf.cell(50, 10, f" ${v['Total']}.00", border=1, ln=True)
         
         pdf.set_font("Arial", "B", 11)
         pdf.cell(140, 10, " TOTAL PAGADO:", border=1, align="R")
         pdf.cell(50, 10, f" ${v['Total']}.00", border=1, ln=True)
         
-        # --- CLAVE DE ACTIVACIÓN ---
+        # Clave de Activación (Destacada)
         pdf.ln(15)
         pdf.set_font("Arial", "B", 12)
         pdf.cell(190, 10, "TU CLAVE DE ACTIVACION PARA LA APP:", ln=True, align="C")
@@ -102,20 +104,20 @@ def descargar_factura(clave: str):
         pdf.ln(5)
         pdf.set_font("Arial", "I", 10)
         pdf.multi_cell(190, 8, "Use esta clave en nuestra App oficial para configurar su pulsera medica.", align="C")
+        
+        pdf.ln(10)
+        pdf.cell(190, 10, "2026 DiagnosticoMedQR - Tu seguridad, nuestra prioridad.", align="C")
 
-        # --- REPARACIÓN DEL ERROR ---
-        # Usamos output() de forma directa para evitar el conflicto de nombres
-        contenido_binario = pdf.output()
+        # Generación directa del contenido
+        contenido = pdf.output()
         
         return Response(
-            content=contenido_binario,
+            content=contenido,
             media_type="application/pdf",
-            headers={
-                "Content-Disposition": f"attachment; filename=Factura_{clave}.pdf"
-            }
+            headers={"Content-Disposition": f"attachment; filename=Factura_{clave}.pdf"}
         )
     except Exception as e:
-        return {"status": "error", "message": f"Fallo en PDF: {str(e)}"}
+        return {"status": "error", "message": str(e)}
 # --- RUTAS RESTANTES (LOGIN Y REGISTRO) ---
 
 class ValidarAcceso(BaseModel):
