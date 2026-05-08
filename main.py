@@ -40,60 +40,52 @@ class ValidarAcceso(BaseModel):
     clave: str
 
 # --- RUTAS DE LA WEB ---
-
 @app.get("/web/factura/{clave}")
 def descargar_factura(clave: str, nombre: str = "Cliente", total: str = "0.00"):
-    try:
-        # Intentamos conectar a Railway para traer datos reales
-        conexion = conectar()
-        cursor = conexion.cursor(pymysql.cursors.DictCursor)
-        cursor.execute("SELECT * FROM ventas WHERE Clave_Generada = %s", (clave,))
-        v = cursor.fetchone()
-        conexion.close()
+    # Generamos el PDF directamente con los datos recibidos
+    # Esto evita depender de que Railway haya terminado de escribir
+    pdf = FPDF()
+    pdf.add_page()
+    
+    # Formato MedQR (Igual al de tu archivo mauricio (2).pdf)
+    pdf.set_font("Arial", "B", 16)
+    pdf.cell(190, 10, "DiagnosticoMedQR", ln=True, align="L") # [cite: 1]
+    pdf.set_font("Arial", "", 12)
+    pdf.cell(190, 8, "Comprobante de Compra Electronico", ln=True, align="L") # [cite: 2]
+    pdf.ln(5)
+    pdf.line(10, 35, 200, 35)
+    
+    pdf.ln(10)
+    pdf.set_font("Arial", "B", 12)
+    pdf.cell(190, 10, "DATOS DEL CLIENTE", ln=True) # [cite: 3]
+    pdf.set_font("Arial", "", 11)
+    pdf.cell(190, 7, f"Nombre: {nombre}", ln=True) # [cite: 4]
+    pdf.cell(190, 7, f"Email: {clave}", ln=True) # Usamos la clave como identificador
+    pdf.cell(190, 7, f"Fecha: 5/8/2026", ln=True) # [cite: 6]
+    
+    # Tabla de productos
+    pdf.ln(10)
+    pdf.set_fill_color(240, 240, 240)
+    pdf.cell(140, 10, " Producto", border=1, fill=True) # 
+    pdf.cell(50, 10, " Precio", border=1, fill=True, ln=True) # 
+    pdf.cell(140, 10, " Pulsera Medica MedQR", border=1)
+    pdf.cell(50, 10, f" ${total}", border=1, ln=True) # 
+    
+    # Clave de activación
+    pdf.ln(15)
+    pdf.set_font("Arial", "B", 12)
+    pdf.cell(190, 10, "TU CLAVE DE ACTIVACION PARA LA APP:", ln=True, align="C") # [cite: 8]
+    pdf.set_font("Arial", "B", 24)
+    pdf.set_text_color(198, 40, 40)
+    pdf.cell(190, 20, clave, ln=True, align="C") # [cite: 9]
+    
+    pdf.set_text_color(0, 0, 0)
+    pdf.ln(5)
+    pdf.set_font("Arial", "I", 10)
+    pdf.multi_cell(190, 8, "Use esta clave en nuestra App oficial para configurar su pulsera medica.", align="C") # [cite: 10]
 
-        # Si Railway ya lo tiene, genial. Si no, usamos los de la URL (Plan B)
-        f_nombre = v['Nombre_Cliente'] if v else nombre
-        f_total = v['Total'] if v else total
-
-        pdf = FPDF()
-        pdf.add_page()
-        
-        # --- ENCABEZADO (Diseño MedQR) ---
-        pdf.set_font("Arial", "B", 16)
-        pdf.cell(190, 10, "DiagnosticoMedQR", ln=True, align="L")
-        pdf.set_font("Arial", "", 12)
-        pdf.cell(190, 8, "Comprobante de Compra Electronico", ln=True, align="L")
-        pdf.ln(5)
-        pdf.line(10, 35, 200, 35)
-        
-        # --- DATOS CLIENTE ---
-        pdf.ln(10)
-        pdf.set_font("Arial", "B", 12)
-        pdf.cell(190, 10, "DATOS DEL CLIENTE", ln=True)
-        pdf.set_font("Arial", "", 11)
-        pdf.cell(190, 7, f"Nombre: {f_nombre}", ln=True)
-        pdf.cell(190, 7, f"Fecha: 5/8/2026", ln=True) # Fecha fija del sistema
-        
-        # --- TABLA DE PRODUCTO ---
-        pdf.ln(10)
-        pdf.set_fill_color(240, 240, 240)
-        pdf.cell(140, 10, " Producto", border=1, fill=True)
-        pdf.cell(50, 10, " Precio", border=1, fill=True, ln=True)
-        pdf.cell(140, 10, " Servicio MedQR", border=1)
-        pdf.cell(50, 10, f" ${f_total}", border=1, ln=True)
-        
-        # --- CLAVE DE ACTIVACIÓN ---
-        pdf.ln(15)
-        pdf.set_font("Arial", "B", 14)
-        pdf.cell(190, 10, "TU CLAVE DE ACTIVACION:", ln=True, align="C")
-        pdf.set_font("Arial", "B", 25)
-        pdf.set_text_color(198, 40, 40)
-        pdf.cell(190, 20, clave, ln=True, align="C")
-
-        return Response(content=pdf.output(), media_type="application/pdf",
-            headers={"Content-Disposition": f"attachment; filename=Factura_{clave}.pdf"})
-    except Exception as e:
-        return {"status": "error", "message": str(e)}
+    return Response(content=pdf.output(), media_type="application/pdf",
+                    headers={"Content-Disposition": f"attachment; filename=Factura_MedQR.pdf"})
 # --- RUTAS RESTANTES (LOGIN Y REGISTRO) ---
 
 class ValidarAcceso(BaseModel):
