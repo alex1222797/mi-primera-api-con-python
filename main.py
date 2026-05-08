@@ -4,11 +4,11 @@ import pymysql
 from pydantic import BaseModel
 from fastapi.responses import HTMLResponse 
 from fastapi.middleware.cors import CORSMiddleware
-from flask_cors import CORS
-CORS(app)
 
+# ELIMINAMOS flask_cors porque estás usando FastAPI
 app = FastAPI()
 
+# CONFIGURACIÓN CORRECTA DE CORS PARA FASTAPI
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -30,7 +30,6 @@ def registrar_venta(venta: DatosVenta):
     try:
         conexion = conectar()
         cursor = conexion.cursor()
-        # Agregamos 'Detalle' al SQL
         sql_venta = """
         INSERT INTO ventas (Nombre_Cliente, Email_Cliente, Clave_Generada, Total, Metodo_Pago, Detalle)
         VALUES (%s, %s, %s, %s, %s, %s)
@@ -38,7 +37,6 @@ def registrar_venta(venta: DatosVenta):
         cursor.execute(sql_venta, (venta.to_name, venta.to_email, venta.to_clave, 
                                    venta.total, venta.metodo_pago, venta.detalle))
         
-        # El resto sigue igual...
         cursor.execute("INSERT IGNORE INTO qrs (`Key`, Activo) VALUES (%s, 0)", (venta.to_clave,))
         conexion.commit()
         conexion.close()
@@ -52,6 +50,7 @@ class DatosPaciente(BaseModel):
     tipo_sangre: str
     alergias: str
     observaciones: str
+
 @app.post("/qr/registrar")
 def registrar_paciente(datos: DatosPaciente):
     try:
@@ -72,6 +71,7 @@ def registrar_paciente(datos: DatosPaciente):
 def ficha_qr(id: str):
     try:
         conexion = conectar()
+        # Usamos DictCursor para que d['Nombre'] funcione
         cursor = conexion.cursor(pymysql.cursors.DictCursor)
         sql = """SELECT p.Nombre, p.Apellido, f.Tipo_Sangre, f.Alergias, f.Observaciones 
                  FROM fichas_medicas f JOIN personas p ON f.ID_Persona = p.ID_Personas WHERE f.ID_Ficha = %s"""
@@ -87,7 +87,7 @@ def ficha_qr(id: str):
         .info{{margin:15px 0;border-bottom:1px solid #eee;padding-bottom:5px;}}
         .label{{color:#ff4b2b;font-weight:bold;font-size:12px;text-transform:uppercase;display:block;}}
         .btn{{display:block;padding:15px;margin-top:10px;border-radius:10px;text-decoration:none;color:white;text-align:center;font-weight:bold;background:#d32f2f;}}
-         .btn-1{{display:block;padding:15px;margin-top:10px;border-radius:10px;text-decoration:none;color:white;text-align:center;font-weight:bold;background:blue;}}</style>
+        .btn-1{{display:block;padding:15px;margin-top:10px;border-radius:10px;text-decoration:none;color:white;text-align:center;font-weight:bold;background:blue;}}</style>
         </head><body><div class="card"><div class="title">🚑 Ficha Médica</div>
         <div class="info"><span class="label">Nombre</span> {d['Nombre']} {d['Apellido']}</div>
         <div class="info"><span class="label">Sangre</span> {d['Tipo_Sangre']}</div>
@@ -97,16 +97,19 @@ def ficha_qr(id: str):
         <a class="btn-1" href="tel:132">📞 SEM (132)</a></div></body></html>"""
     except Exception as e:
         return f"<h1>Error: {str(e)}</h1>"
+
 class ValidarAcceso(BaseModel):
     email: str
     clave: str
+
 @app.post("/app/login")
 def login_app(datos: ValidarAcceso):
-    conexion = conectar()
-    cursor = conexion.cursor(dictionary=True)
-    
     try:
-        # PRIMER FILTRO: ¿Existe esta combinación en la tabla de ventas?
+        conexion = conectar()
+        # Cambiamos a DictCursor para FastAPI
+        cursor = conexion.cursor(pymysql.cursors.DictCursor)
+        
+        # BUSCAR VENTA
         sql = "SELECT * FROM ventas WHERE Email_Cliente = %s AND Clave_Generada = %s"
         cursor.execute(sql, (datos.email, datos.clave))
         venta = cursor.fetchone()
@@ -114,7 +117,7 @@ def login_app(datos: ValidarAcceso):
         if not venta:
             return {"status": "error", "message": "Acceso Denegado: Correo o Clave no encontrados."}
         
-        # SEGUNDO FILTRO: ¿El QR ya está activo? (Para que no usen la clave dos veces)
+        # BUSCAR SI EL QR YA ESTÁ ACTIVO
         sql_qr = "SELECT Activo FROM qrs WHERE `Key` = %s"
         cursor.execute(sql_qr, (datos.clave,))
         qr = cursor.fetchone()
@@ -122,7 +125,6 @@ def login_app(datos: ValidarAcceso):
         if qr and qr['Activo'] == 1:
             return {"status": "error", "message": "Esta clave ya fue utilizada para activar una pulsera."}
             
-        # SI PASA TODO:
         return {
             "status": "success", 
             "message": "Bienvenido",
@@ -132,4 +134,5 @@ def login_app(datos: ValidarAcceso):
     except Exception as e:
         return {"status": "error", "message": str(e)}
     finally:
-        conexion.close()
+        if 'conexion' in locals():
+            conexion.close()
