@@ -61,79 +61,61 @@ def registrar_venta(venta: DatosVenta):
         return {"status": "error", "message": str(e)}
 
 @app.get("/web/factura/{clave}")
-def descargar_factura(clave: str, nombre: str = "Cliente", total: str = "0.00"):
+def descargar_factura(clave: str, nombre: str = "Cliente", total: str = "0.00", items: str = ""):
     try:
         pdf = FPDF()
         pdf.add_page()
         
-        # --- ENCABEZADO ---
-        pdf.set_font("Arial", "B", 20)
-        pdf.set_text_color(198, 40, 40) # Tu rojo característico
-        pdf.cell(190, 15, "Diagnostico MedQR", ln=True, align="L")
-        
-        pdf.set_font("Arial", "B", 10)
-        pdf.set_text_color(100, 100, 100)
-        pdf.cell(190, 5, "Comprobante de Compra Electronico", ln=True, align="L")
-        pdf.ln(10)
-        
-        # --- SECCIÓN: DATOS DEL CLIENTE ---
-        pdf.set_fill_color(240, 240, 240)
-        pdf.set_font("Arial", "B", 11)
-        pdf.set_text_color(0, 0, 0)
-        pdf.cell(190, 8, "  DATOS DEL CLIENTE", ln=True, fill=True)
-        pdf.ln(2)
+        # --- ENCABEZADO ESTILO MEDQR ---
+        pdf.set_font("Arial", "B", 22)
+        pdf.set_text_color(198, 40, 40) 
+        pdf.cell(190, 15, "Diagnostico MedQR", ln=True)
         
         pdf.set_font("Arial", "", 10)
-        pdf.cell(190, 6, f"  Nombre: {nombre}", ln=True)
-        pdf.cell(190, 6, f"  Email: mauricioalexandergarciacornejo@gmail.com", ln=True)
-        pdf.cell(190, 6, f"  Fecha: 5/8/2026", ln=True) # Podés usar datetime para fecha real
+        pdf.set_text_color(100, 100, 100)
+        pdf.cell(190, 5, "Comprobante de Compra Electronico", ln=True)
         pdf.ln(10)
-        
+
         # --- TABLA DE PRODUCTOS ---
-        # Encabezado de tabla
-        pdf.set_font("Arial", "B", 10)
         pdf.set_fill_color(198, 40, 40)
         pdf.set_text_color(255, 255, 255)
-        pdf.cell(140, 8, " Producto", border=0, fill=True)
-        pdf.cell(50, 8, " Precio", border=0, fill=True, ln=True, align="C")
-        
-        # Contenido de la tabla (Basado en tu ejemplo)
-        pdf.set_font("Arial", "", 10)
+        pdf.set_font("Arial", "B", 10)
+        pdf.cell(140, 8, " Producto", fill=True)
+        pdf.cell(50, 8, " Precio", fill=True, ln=True, align="C")
+
         pdf.set_text_color(0, 0, 0)
-        pdf.set_fill_color(255, 255, 255)
+        pdf.set_font("Arial", "", 10)
         
-        # Aquí podrías iterar un array si lo tuvieras, por ahora simulamos el formato:
-        pdf.cell(140, 8, " Pulseras Medicas (Pack)", border="B")
-        pdf.cell(50, 8, f"${total}", border="B", ln=True, align="C")
-        
-        # Total
+        # Procesar los productos (Roja|5;Negra|5)
+        if items:
+            for fila in items.split(";"):
+                if "|" in fila:
+                    p_nom, p_pre = fila.split("|")
+                    pdf.cell(140, 8, f" {p_nom}", border="B")
+                    pdf.cell(50, 8, f"${p_pre}", border="B", ln=True, align="C")
+
         pdf.ln(2)
-        pdf.set_font("Arial", "B", 11)
-        pdf.cell(140, 10, "", border=0)
-        pdf.cell(50, 10, f"TOTAL PAGADO: ${total}", border=0, ln=True, align="R")
+        pdf.set_font("Arial", "B", 12)
+        pdf.cell(140, 10, "TOTAL PAGADO: ", align="R")
+        pdf.cell(50, 10, f"${total}", ln=True, align="C")
+
+        # --- CLAVE GIGANTE ---
         pdf.ln(10)
-        
-        # --- SECCIÓN CLAVE (LLAMATIVA) ---
-        pdf.set_font("Arial", "B", 11)
-        pdf.cell(190, 8, "TU CLAVE DE ACTIVACION PARA LA APP:", ln=True, align="C")
-        
-        pdf.set_font("Arial", "B", 24)
+        pdf.set_font("Arial", "B", 26)
         pdf.set_text_color(198, 40, 40)
         pdf.cell(190, 15, clave, ln=True, align="C")
-        
-        pdf.set_font("Arial", "", 9)
-        pdf.set_text_color(50, 50, 50)
-        pdf.multi_cell(190, 5, "\nUse esta clave en nuestra App oficial para configurar su pulsera medica.", align="C")
-        
-        # --- PIE DE PÁGINA ---
-        pdf.set_y(-30)
-        pdf.set_font("Arial", "I", 8)
-        pdf.set_text_color(150, 150, 150)
-        pdf.cell(190, 10, "2026 DiagnosticoMedQR - Tu seguridad, nuestra prioridad.", align="C")
 
-        return Response(content=pdf.output(dest='S'),  # <--- Quitamos .encode('latin-1')
-    media_type="application/pdf",
-    headers={"Content-Disposition": f"attachment; filename=Factura_{clave}.pdf"})
+        # --- EL PARCHE DEFINITIVO ---
+        output = pdf.output(dest='S')
+        # Si ya son bytes (tu caso), se mandan directo. Si es texto, se encodea.
+        final_payload = output.encode('latin-1') if isinstance(output, str) else output
+
+        return Response(
+            content=final_payload,
+            media_type="application/pdf",
+            headers={"Content-Disposition": f"attachment; filename=Factura_{clave}.pdf"}
+        )
+
     except Exception as e:
         return {"status": "error", "message": str(e)}
 # --- RUTAS DEL APP / QR ---
