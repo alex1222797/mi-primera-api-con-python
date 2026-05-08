@@ -40,126 +40,75 @@ class ValidarAcceso(BaseModel):
     clave: str
 
 # --- RUTAS DE LA WEB ---
-@app.get("/web/factura/{clave}")
-def descargar_factura(clave: str, nombre: str = "Cliente", total: str = "0.00"):
-    try:
-        # Intentamos conectar a Railway solo para verificar, pero no bloqueamos el PDF
-        try:
-            conexion = conectar()
-            cursor = conexion.cursor(pymysql.cursors.DictCursor)
-            cursor.execute("SELECT * FROM ventas WHERE Clave_Generada = %s", (clave,))
-            v = cursor.fetchone()
-            conexion.close()
-            if v:
-                nombre = v['Nombre_Cliente']
-                total = v['Total']
-        except:
-            pass # Si falla Railway, usamos los datos que vienen de la web
 
-        pdf = FPDF()
-        pdf.add_page()
-        
-        # --- DISEÑO PROFESIONAL ---
-        pdf.set_font("Arial", "B", 16)
-        pdf.cell(190, 10, "DiagnosticoMedQR", ln=True, align="L")
-        pdf.set_font("Arial", "", 12)
-        pdf.cell(190, 8, "Comprobante de Compra Electronico", ln=True, align="L")
-        pdf.ln(5)
-        pdf.line(10, 35, 200, 35)
-        
-        pdf.ln(10)
-        pdf.set_font("Arial", "B", 12)
-        pdf.cell(190, 10, "DATOS DEL CLIENTE", ln=True)
-        pdf.set_font("Arial", "", 11)
-        pdf.cell(190, 7, f"Nombre: {nombre}", ln=True)
-        pdf.cell(190, 7, f"Clave: {clave}", ln=True)
-        
-        pdf.ln(10)
-        pdf.set_fill_color(240, 240, 240)
-        pdf.cell(140, 10, " Producto", border=1, fill=True)
-        pdf.cell(50, 10, " Precio", border=1, fill=True, ln=True)
-        pdf.cell(140, 10, " Servicio DiagnosticoMedQR", border=1)
-        pdf.cell(50, 10, f" ${total}", border=1, ln=True)
-        
-        pdf.ln(15)
-        pdf.set_font("Arial", "B", 14)
-        pdf.cell(190, 10, "TU CLAVE DE ACTIVACION:", ln=True, align="C")
-        pdf.set_font("Arial", "B", 25)
-        pdf.set_text_color(198, 40, 40)
-        pdf.cell(190, 20, clave, ln=True, align="C")
-
-        return Response(content=pdf.output(), media_type="application/pdf",
-            headers={"Content-Disposition": f"attachment; filename=Factura_{clave}.pdf"})
-    except Exception as e:
-        return {"status": "error", "message": f"Error en servidor: {str(e)}"}
-# --- RUTAS RESTANTES (LOGIN Y REGISTRO) ---
-
-class ValidarAcceso(BaseModel):
-    email: str
-    clave: str
-
-@app.post("/app/login")
-def login_app(datos: ValidarAcceso):
-    try:
-        conexion = conectar()
-        cursor = conexion.cursor(pymysql.cursors.DictCursor)
-        sql = "SELECT * FROM ventas WHERE Email_Cliente = %s AND Clave_Generada = %s"
-        cursor.execute(sql, (datos.email, datos.clave))
-        venta = cursor.fetchone()
-        
-        if not venta:
-            return {"status": "error", "message": "Acceso Denegado: Datos incorrectos."}
-        
-        sql_qr = "SELECT Activo FROM qrs WHERE `Key` = %s"
-        cursor.execute(sql_qr, (datos.clave,))
-        qr = cursor.fetchone()
-        
-        if qr and qr['Activo'] == 1:
-            return {"status": "error", "message": "Esta clave ya fue utilizada."}
-            
-        return {"status": "success", "message": "Bienvenido", "cliente": venta['Nombre_Cliente']}
-    except Exception as e:
-        return {"status": "error", "message": str(e)}
-    finally:
-        if 'conexion' in locals(): conexion.close()
-
-class DatosPaciente(BaseModel):
-    nombre: str
-    apellido: str
-    tipo_sangre: str
-    alergias: str
-    observaciones: str
-
-@app.post("/qr/registrar")
-def registrar_paciente(datos: DatosPaciente):
+@app.post("/web/venta")
+def registrar_venta(venta: DatosVenta):
     try:
         conexion = conectar()
         cursor = conexion.cursor()
-        cursor.execute("INSERT INTO personas (Nombre, Apellido) VALUES (%s, %s)", (datos.nombre, datos.apellido))
-        id_p = cursor.lastrowid 
-        sql_f = "INSERT INTO fichas_medicas (ID_Persona, Tipo_Sangre, Alergias, Observaciones) VALUES (%s, %s, %s, %s)"
-        cursor.execute(sql_f, (id_p, datos.tipo_sangre, datos.alergias, datos.observaciones))
-        id_f = cursor.lastrowid 
+        sql_venta = """
+        INSERT INTO ventas (Nombre_Cliente, Email_Cliente, Clave_Generada, Total, Metodo_Pago, Detalle)
+        VALUES (%s, %s, %s, %s, %s, %s)
+        """
+        cursor.execute(sql_venta, (venta.to_name, venta.to_email, venta.to_clave, 
+                                   venta.total, venta.metodo_pago, venta.detalle))
+        
+        cursor.execute("INSERT IGNORE INTO qrs (`Key`, Activo) VALUES (%s, 0)", (venta.to_clave,))
         conexion.commit()
         conexion.close()
-        return {"status": "ok", "id_ficha": id_f}
+        return {"status": "ok"}
     except Exception as e:
         return {"status": "error", "message": str(e)}
 
-@app.get("/qr/ficha/{id}", response_class=HTMLResponse)
-def ficha_qr(id: str):
+@app.get("/web/factura/{clave}")
+def descargar_factura(clave: str):
     try:
         conexion = conectar()
         cursor = conexion.cursor(pymysql.cursors.DictCursor)
-        sql = """SELECT p.Nombre, p.Apellido, f.Tipo_Sangre, f.Alergias, f.Observaciones 
-                 FROM fichas_medicas f JOIN personas p ON f.ID_Persona = p.ID_Personas WHERE f.ID_Ficha = %s"""
-        cursor.execute(sql, (id,))
-        d = cursor.fetchone()
+        sql = "SELECT * FROM ventas WHERE Clave_Generada = %s"
+        cursor.execute(sql, (clave,))
+        v = cursor.fetchone()
         conexion.close()
-        if not d: return "<h1>No encontrado</h1>"
-        return f"<html>...</html>" # (Aquí va tu HTML de la ficha médica)
+
+        if not v:
+            return {"status": "error", "message": "Venta no encontrada"}
+
+        # Generar PDF
+        pdf = FPDF()
+        pdf.add_page()
+        
+        # Encabezado
+        pdf.set_font("Arial", "B", 20)
+        pdf.set_text_color(211, 47, 47) 
+        pdf.cell(190, 15, "DIAGNOSTICMED - COMPROBANTE", ln=True, align="C")
+        
+        # Datos
+        pdf.set_font("Arial", "", 12)
+        pdf.set_text_color(0, 0, 0)
+        pdf.ln(10)
+        pdf.cell(190, 10, f"Cliente: {v['Nombre_Cliente']}", ln=True)
+        pdf.cell(190, 10, f"Email: {v['Email_Cliente']}", ln=True)
+        pdf.cell(190, 10, f"Metodo de Pago: {v['Metodo_Pago']}", ln=True)
+        pdf.ln(5)
+        pdf.set_font("Arial", "B", 12)
+        pdf.cell(190, 10, f"CLAVE DE ACTIVACION: {v['Clave_Generada']}", ln=True)
+        pdf.ln(5)
+        pdf.set_font("Arial", "", 12)
+        pdf.cell(190, 10, f"Detalle: {v['Detalle']}", ln=True)
+        pdf.set_font("Arial", "B", 14)
+        pdf.cell(190, 15, f"TOTAL: ${v['Total']}", ln=True)
+        
+        pdf.ln(10)
+        pdf.set_font("Arial", "I", 10)
+        pdf.multi_cell(190, 10, "Usa esta clave en la App para activar tu servicio.")
+
+        return Response(
+            content=bytes(pdf.output()),
+            media_type="application/pdf",
+            headers={"Content-Disposition": f"attachment; filename=Factura_{clave}.pdf"}
+        )
     except Exception as e:
-        return f"<h1>Error: {str(e)}</h1>"
+        return {"status": "error", "message": str(e)}
 
 # --- RUTAS DEL APP / QR ---
 
