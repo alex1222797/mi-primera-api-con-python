@@ -4,3 +4,4 @@ pymysql
 pydantic
 cryptography
 python-multipart
+fpdf2
