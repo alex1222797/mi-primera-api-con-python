@@ -13,7 +13,36 @@ app.add_middleware(
     allow_methods=["*"], #permite el get y post
     allow_headers=["*"],
 )
+#--VALIDAR LOS DATOS QUE VIENEN DEL SITIO WEB--
+class DatosVenta(BaseModel):
+    to_name: str
+    to_email: str
+    to_clave: str
+    total: str
+    metodo_pago: str
+#--ENDPOIN PARA GUARDAR EN RALIWAY
+@app.post("/web/venta")
+def registrar_venta(venta: DatosVenta):
+    try:
+        conexion = conectar()
+        cursor = conexion.cursor()
+        #aqui insertamos en la tabla ventas
+        sql_venta = """
+        INSERT INTO ventas (Nombre_Cliente,Email_Cliente,Clave_Generada,Total,Metodo_Pago)
+        VALUES (%s, %s, %s ,%s ,%s)
+        """
+        cursor.execute(sql_venta, (venta.to_name, venta.to_email, venta.clave , venta.total , venta.metodo_pago))
+        # Insertar en 'qrs' para que Flutter pueda activarlo después
+        # Usamos IGNORE por si acaso se repite la clave
+        sql_qr = "INSERT IGNORE INTO qrs (`Key`, Activo) VALUES (%s, 0)"
+        cursor.execute(sql_qr, (venta.clave,))
 
+        conexion.commit()
+        conexion.close()
+        return {"status": "ok", "message": "Venta y Clave QR sincronizadas"}
+    
+    except Exception as e:
+        return {"status": "error", "message": str(e)}
 # --- MODELO PARA RECIBIR DATOS DESDE FLUTTER ---
 class DatosPaciente(BaseModel):
     nombre: str
