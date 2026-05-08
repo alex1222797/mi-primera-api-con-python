@@ -1,4 +1,4 @@
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI
 from databaseQR import conectar 
 import pymysql
 from pydantic import BaseModel
@@ -7,13 +7,13 @@ from fastapi.middleware.cors import CORSMiddleware
 
 app = FastAPI()
 
-# Asegúrate de que esto esté justo después de app = FastAPI()
+# --- ESTA PARTE ES LA QUE ARREGLA EL ERROR DE CORS ---
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # Permite a cualquier origen (como tu localhost)
+    allow_origins=["*"],
     allow_credentials=True,
-    allow_methods=["*"],  # Permite POST, GET, OPTIONS, etc.
-    allow_headers=["*"],  # Permite todos los headers
+    allow_methods=["*"],
+    allow_headers=["*"],
 )
 
 class DatosVenta(BaseModel):
@@ -28,10 +28,9 @@ def registrar_venta(venta: DatosVenta):
     try:
         conexion = conectar()
         cursor = conexion.cursor()
-        
         sql_venta = """
-        INSERT INTO ventas (Nombre_Cliente, Email_Cliente, Clave_Generada, Total, Metodo_Pago)
-        VALUES (%s, %s, %s, %s, %s)
+            INSERT INTO ventas (Nombre_Cliente, Email_Cliente, Clave_Generada, Total, Metodo_Pago)
+            VALUES (%s, %s, %s, %s, %s)
         """
         cursor.execute(sql_venta, (venta.to_name, venta.to_email, venta.to_clave, venta.total, venta.metodo_pago))
         
@@ -40,9 +39,8 @@ def registrar_venta(venta: DatosVenta):
 
         conexion.commit()
         conexion.close()
-        return {"status": "ok", "message": "Venta y Clave QR sincronizadas"}
+        return {"status": "ok", "message": "Venta guardada"}
     except Exception as e:
-        print(f"Error en el servidor: {e}") 
         return {"status": "error", "message": str(e)}
 
 class DatosPaciente(BaseModel):
@@ -70,7 +68,7 @@ def registrar_paciente(datos: DatosPaciente):
 
         conexion.commit()
         conexion.close()
-        return {"status": "ok", "id_ficha": id_ficha, "message": "Paciente guardado"}
+        return {"status": "ok", "id_ficha": id_ficha}
     except Exception as e:
         return {"status": "error", "message": str(e)}
 
@@ -79,30 +77,13 @@ def ficha_qr(id: str):
     try:
         conexion = conectar()
         cursor = conexion.cursor(pymysql.cursors.DictCursor)
-        sql = """
-            SELECT p.Nombre, p.Apellido, f.Tipo_Sangre, f.Alergias, f.Observaciones
-            FROM fichas_medicas f
-            JOIN personas p ON f.ID_Persona = p.ID_Personas
-            WHERE f.ID_Ficha = %s
-        """
+        sql = "SELECT p.Nombre, p.Apellido, f.Tipo_Sangre, f.Alergias, f.Observaciones FROM fichas_medicas f JOIN personas p ON f.ID_Persona = p.ID_Personas WHERE f.ID_Ficha = %s"
         cursor.execute(sql, (id,))
         data = cursor.fetchone()
         conexion.close()
 
-        if not data:
-            return "<h1>No se encontró la ficha</h1>"
+        if not data: return "<h1>No existe</h1>"
 
-        return f"""
-        <html>
-            <body style="font-family:Arial; background:#f2f2f2; padding:20px;">
-                <div style="background:white; padding:20px; border-radius:15px; border-top:8px solid #ff4b2b;">
-                    <h2>🚑 Ficha Médica</h2>
-                    <p><b>Nombre:</b> {data['Nombre']} {data['Apellido']}</p>
-                    <p><b>Sangre:</b> {data['Tipo_Sangre']}</p>
-                    <p><b>Alergias:</b> {data['Alergias']}</p>
-                </div>
-            </body>
-        </html>
-        """
+        return f"<html><body style='font-family:Arial; padding:20px;'><h1>🚑 Ficha Médica</h1><p><b>Paciente:</b> {data['Nombre']} {data['Apellido']}</p><p><b>Sangre:</b> {data['Tipo_Sangre']}</p><p><b>Alergias:</b> {data['Alergias']}</p></body></html>"
     except Exception as e:
         return f"<h1>Error: {str(e)}</h1>"
