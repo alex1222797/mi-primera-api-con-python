@@ -41,51 +41,6 @@ class ValidarAcceso(BaseModel):
 
 # --- RUTAS DE LA WEB ---
 
-@app.post("/web/venta")
-def registrar_venta(venta: DatosVenta):
-    try:
-        conexion = conectar()
-        cursor = conexion.cursor()
-        sql_venta = """
-        INSERT INTO ventas (Nombre_Cliente, Email_Cliente, Clave_Generada, Total, Metodo_Pago, Detalle)
-        VALUES (%s, %s, %s, %s, %s, %s)
-        """
-        cursor.execute(sql_venta, (venta.to_name, venta.to_email, venta.to_clave, 
-                                   venta.total, venta.metodo_pago, venta.detalle))
-        
-        cursor.execute("INSERT IGNORE INTO qrs (`Key`, Activo) VALUES (%s, 0)", (venta.to_clave,))
-        conexion.commit()
-        conexion.close()
-        return {"status": "ok"}
-    except Exception as e:
-        return {"status": "error", "message": str(e)}
-from fastapi import FastAPI, Response
-from databaseQR import conectar 
-import pymysql
-from pydantic import BaseModel
-from fastapi.responses import HTMLResponse 
-from fastapi.middleware.cors import CORSMiddleware
-from fpdf import FPDF
-
-app = FastAPI()
-
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
-
-class DatosVenta(BaseModel):
-    to_name: str
-    to_email: str
-    to_clave: str
-    total: str
-    metodo_pago: str
-    detalle: str
-
-# --- RUTA DE FACTURA CORREGIDA ---
 @app.get("/web/factura/{clave}")
 def descargar_factura(clave: str):
     try:
@@ -99,71 +54,69 @@ def descargar_factura(clave: str):
         if not v:
             return {"status": "error", "message": "Venta no encontrada"}
 
+        # Crear el PDF con el formato solicitado 
         pdf = FPDF()
         pdf.add_page()
         
-        # ENCABEZADO
+        # --- ENCABEZADO PROFESIONAL ---
         pdf.set_font("Arial", "B", 16)
-        pdf.cell(190, 10, "DiagnosticoMedQR", ln=True, align="L")
+        pdf.cell(190, 10, "DiagnosticoMedQR", ln=True, align="L") # [cite: 1]
         pdf.set_font("Arial", "", 12)
-        pdf.cell(190, 8, "Comprobante de Compra Electronico", ln=True, align="L")
+        pdf.cell(190, 8, "Comprobante de Compra Electronico", ln=True, align="L") # [cite: 2]
         pdf.ln(5)
         pdf.line(10, 35, 200, 35)
         
-        # DATOS DEL CLIENTE
+        # --- DATOS DEL CLIENTE ---
         pdf.ln(10)
         pdf.set_font("Arial", "B", 12)
-        pdf.cell(190, 10, "DATOS DEL CLIENTE", ln=True)
+        pdf.cell(190, 10, "DATOS DEL CLIENTE", ln=True) # [cite: 3]
         pdf.set_font("Arial", "", 11)
-        pdf.cell(190, 7, f"Nombre: {v['Nombre_Cliente']}", ln=True)
-        pdf.cell(190, 7, f"Email: {v['Email_Cliente']}", ln=True)
-        pdf.cell(190, 7, "Fecha: 5/8/2026", ln=True)
+        pdf.cell(190, 7, f"Nombre: {v['Nombre_Cliente']}", ln=True) # [cite: 4]
+        pdf.cell(190, 7, f"Email: {v['Email_Cliente']}", ln=True) # [cite: 5]
+        pdf.cell(190, 7, f"Fecha: 5/8/2026", ln=True) # [cite: 6]
         
-        # TABLA DE PRODUCTOS
+        # --- TABLA DE PRODUCTOS ---
         pdf.ln(10)
         pdf.set_fill_color(240, 240, 240)
         pdf.set_font("Arial", "B", 11)
-        pdf.cell(140, 10, " Producto", border=1, fill=True)
-        pdf.cell(50, 10, " Precio", border=1, fill=True, ln=True)
+        pdf.cell(140, 10, " Producto", border=1, fill=True) # [cite: 7]
+        pdf.cell(50, 10, " Precio", border=1, fill=True, ln=True) # [cite: 7]
         
         pdf.set_font("Arial", "", 11)
-        # Limpiamos el detalle para que no salgan caracteres raros
-        detalle_limpio = v['Detalle'].replace('|', '-').strip()
-        pdf.cell(140, 10, f" {detalle_limpio}", border=1)
-        pdf.cell(50, 10, f" ${v['Total']}.00", border=1, ln=True)
+        # Limpieza básica del detalle para evitar errores de caracteres
+        detalle_texto = v['Detalle'].replace('|', '-').strip()
+        pdf.cell(140, 10, f" {detalle_texto}", border=1)
+        pdf.cell(50, 10, f" ${v['Total']}.00", border=1, ln=True) # [cite: 7]
         
         pdf.set_font("Arial", "B", 11)
         pdf.cell(140, 10, " TOTAL PAGADO:", border=1, align="R")
-        pdf.cell(50, 10, f" ${v['Total']}.00", border=1, ln=True)
+        pdf.cell(50, 10, f" ${v['Total']}.00", border=1, ln=True) # [cite: 7]
         
-        # CLAVE DE ACTIVACIÓN
+        # --- CLAVE DE ACTIVACIÓN ---
         pdf.ln(15)
-        pdf.set_fill_color(255, 243, 224)
         pdf.set_font("Arial", "B", 12)
-        pdf.cell(190, 10, "TU CLAVE DE ACTIVACION PARA LA APP:", ln=True, align="C")
+        pdf.cell(190, 10, "TU CLAVE DE ACTIVACION PARA LA APP:", ln=True, align="C") # [cite: 8]
         pdf.set_font("Arial", "B", 24)
-        pdf.set_text_color(198, 40, 40)
-        pdf.cell(190, 20, v['Clave_Generada'], ln=True, align="C")
+        pdf.set_text_color(198, 40, 40) # Color rojo corporativo
+        pdf.cell(190, 20, v['Clave_Generada'], ln=True, align="C") # [cite: 9]
         
         pdf.set_text_color(0, 0, 0)
+        pdf.ln(5)
         pdf.set_font("Arial", "I", 10)
-        pdf.multi_cell(190, 8, "Use esta clave en nuestra App oficial para configurar su pulsera medica.", align="C")
-        
-        pdf.ln(20)
-        pdf.set_font("Arial", "", 9)
-        pdf.cell(190, 10, "2026 DiagnosticoMedQR - Tu seguridad, nuestra prioridad.", align="C")
+        pdf.multi_cell(190, 8, "Use esta clave en nuestra App oficial para configurar su pulsera medica.", align="C") # [cite: 10]
 
-        # Generar salida
-        pdf_content = pdf.output()
+        # --- GENERACIÓN FINAL ---
+        # Aseguramos que se genere como bytes sin referencias externas
+        resultado_pdf = pdf.output() 
         
         return Response(
-            content=pdf_content,
+            content=resultado_pdf,
             media_type="application/pdf",
             headers={"Content-Disposition": f"attachment; filename=Factura_{clave}.pdf"}
         )
     except Exception as e:
+        # Esto te dirá exactamente qué falla si ocurre algo nuevo
         return {"status": "error", "message": str(e)}
-
 # --- RUTAS RESTANTES (LOGIN Y REGISTRO) ---
 
 class ValidarAcceso(BaseModel):
