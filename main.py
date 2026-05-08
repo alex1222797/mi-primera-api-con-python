@@ -7,12 +7,13 @@ from fastapi.middleware.cors import CORSMiddleware
 
 app = FastAPI()
 
+# Asegúrate de que esto esté justo después de app = FastAPI()
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=["*"],  # Permite a cualquier origen (como tu localhost)
     allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_methods=["*"],  # Permite POST, GET, OPTIONS, etc.
+    allow_headers=["*"],  # Permite todos los headers
 )
 
 class DatosVenta(BaseModel):
