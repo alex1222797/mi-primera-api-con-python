@@ -4,6 +4,8 @@ import pymysql
 from pydantic import BaseModel
 from fastapi.responses import HTMLResponse 
 from fastapi.middleware.cors import CORSMiddleware
+from flask_cors import CORS
+CORS(app)
 
 app = FastAPI()
 
