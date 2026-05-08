@@ -50,7 +50,6 @@ class DatosPaciente(BaseModel):
     tipo_sangre: str
     alergias: str
     observaciones: str
-
 @app.post("/qr/registrar")
 def registrar_paciente(datos: DatosPaciente):
     try:
@@ -96,3 +95,39 @@ def ficha_qr(id: str):
         <a class="btn-1" href="tel:132">📞 SEM (132)</a></div></body></html>"""
     except Exception as e:
         return f"<h1>Error: {str(e)}</h1>"
+class ValidarAcceso(BaseModel):
+    email: str
+    clave: str
+@app.post("/app/login")
+def login_app(datos: ValidarAcceso):
+    conexion = conectar()
+    cursor = conexion.cursor(dictionary=True)
+    
+    try:
+        # PRIMER FILTRO: ¿Existe esta combinación en la tabla de ventas?
+        sql = "SELECT * FROM ventas WHERE Email_Cliente = %s AND Clave_Generada = %s"
+        cursor.execute(sql, (datos.email, datos.clave))
+        venta = cursor.fetchone()
+        
+        if not venta:
+            return {"status": "error", "message": "Acceso Denegado: Correo o Clave no encontrados."}
+        
+        # SEGUNDO FILTRO: ¿El QR ya está activo? (Para que no usen la clave dos veces)
+        sql_qr = "SELECT Activo FROM qrs WHERE `Key` = %s"
+        cursor.execute(sql_qr, (datos.clave,))
+        qr = cursor.fetchone()
+        
+        if qr and qr['Activo'] == 1:
+            return {"status": "error", "message": "Esta clave ya fue utilizada para activar una pulsera."}
+            
+        # SI PASA TODO:
+        return {
+            "status": "success", 
+            "message": "Bienvenido",
+            "cliente": venta['Nombre_Cliente']
+        }
+        
+    except Exception as e:
+        return {"status": "error", "message": str(e)}
+    finally:
+        conexion.close()
