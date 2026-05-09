@@ -153,13 +153,13 @@ def registrar_todo_el_perfil(data: dict):
         cursor = conexion.cursor()
 
         # 1. Insertar en tabla 'personas'
+        # NO incluimos ID_Personas aquí porque el Auto-incremento lo pondrá solo
         sql_persona = """
             INSERT INTO personas 
             (Tipo, Nombre, Apellido, Edad, DUI, Telefono, Responsable_Nombre, Responsable_Telefono) 
             VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
         """
         
-        # OJO: Verifica si en tu DB es 'Appellido' con doble 'p' como en una de tus capturas
         valores_p = (
             data.get('tipo_paciente'), 
             data.get('nombre'),
@@ -172,10 +172,12 @@ def registrar_todo_el_perfil(data: dict):
         )
 
         cursor.execute(sql_persona, valores_p)
-        id_persona = cursor.lastrowid 
+        
+        # Recuperamos el ID que MySQL acaba de generar automáticamente
+        id_persona_generado = cursor.lastrowid 
 
         # 2. Insertar en tabla 'fichas_medicas'
-        # USAMOS EL NOMBRE EXACTO: ID_Personas
+        # Usamos el nombre exacto de tu columna: ID_Personas
         sql_ficha = """
             INSERT INTO fichas_medicas (ID_Personas, Tipo_Sangre, Alergias, Observaciones) 
             VALUES (%s, %s, %s, %s)
@@ -184,14 +186,14 @@ def registrar_todo_el_perfil(data: dict):
         obs = f"Med: {data.get('medicamentos', '')} | Enf: {data.get('enfermedades', '')}"
         
         cursor.execute(sql_ficha, (
-            id_persona, 
+            id_persona_generado, 
             data.get('tipo_sangre', 'N/A'), 
             data.get('alergias', 'Ninguna'), 
             obs
         ))
 
         conexion.commit()
-        return {"status": "ok", "id": id_persona}
+        return {"status": "ok", "id": id_persona_generado}
 
     except Exception as e:
         if conexion: conexion.rollback()
