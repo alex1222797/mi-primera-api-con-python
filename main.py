@@ -10,7 +10,9 @@ import random, string
 import smtplib
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
-
+import os
+import string
+import random
 
 app = FastAPI()
 
