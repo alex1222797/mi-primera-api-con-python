@@ -159,8 +159,8 @@ def registrar_todo_el_perfil(data: dict):
         conexion = conectar()
         cursor = conexion.cursor()
 
-        # QUITAMOS Huella_ID del SQL para que no de error
-        # Usamos exactamente las columnas que vi en tu captura de Railway
+        # 1. Insertar en tabla 'personas'
+        # Basado en tu foto: ID_Personas es la PK
         sql_persona = """
             INSERT INTO personas 
             (Tipo, Nombre, Apellido, Edad, DUI, Telefono, Responsable_Nombre, Responsable_Telefono) 
@@ -173,38 +173,18 @@ def registrar_todo_el_perfil(data: dict):
             data.get('apellido'),
             data.get('edad'),
             data.get('dui'),
-            data.get('telefono_responsable'), # O el telefono que uses
+            data.get('telefono_responsable'), 
             data.get('responsable'), 
             data.get('telefono_responsable')
         )
 
         cursor.execute(sql_persona, valores_p)
-        id_persona = cursor.lastrowid
+        id_persona = cursor.lastrowid # Este es el ID_Personas generado
 
-        # 2. Insertar en fichas_medicas
+        # 2. Insertar en tabla 'fichas_medicas'
+        # IMPORTANTE: Aquí cambiamos a ID_Personas (con 's') para que coincida con tu FK
         sql_ficha = """
-            INSERT INTO fichas_medicas (ID_Persona, Tipo_Sangre, Alergias, Observaciones) 
-            VALUES (%s, %s, %s, %s)
-        """
-        # Metemos medicamentos y enfermedades en Observaciones para ahorrar espacio
-        obs = f"Med: {data.get('medicamentos')} | Enf: {data.get('enfermedades')}"
-        
-        cursor.execute(sql_ficha, (
-            id_persona, 
-            data.get('tipo_sangre'), 
-            data.get('alergias'), 
-            obs
-        ))
-
-        conexion.commit()
-        return {"status": "ok", "id": id_persona}
-
-    except Exception as e:
-        if conexion: conexion.rollback()
-        print(f"Error real: {str(e)}") # Esto saldrá en los logs de Render
-        return {"status": "error", "message": str(e)}
-    finally:
-        if conexion: conexion.close()
+            INSERT INTO fichas_medicas (ID_Persona, Tipo_Sangre,
 @app.post("/qr/registrar")
 def registrar_paciente(datos: DatosPaciente):
     try:
