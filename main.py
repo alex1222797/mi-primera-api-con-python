@@ -308,7 +308,97 @@ def registrar_paciente(datos: DatosPaciente):
     except Exception as e:
         return {"status": "error", "message": str(e)}
 
+# ─────────────────────────────────────────────────────────────────────────────
+# Agrega este import al inicio de tu main.py
+# ─────────────────────────────────────────────────────────────────────────────
+# from email_service import enviar_clave_activacion
 
+# ─────────────────────────────────────────────────────────────────────────────
+# Reemplaza tu /web/venta con este
+# ─────────────────────────────────────────────────────────────────────────────
+
+@app.post("/web/venta")
+def registrar_venta(venta: DatosVenta):
+    conexion = None
+    try:
+        conexion = conectar()
+        cursor = conexion.cursor(pymysql.cursors.DictCursor)
+
+        # 1. Verificar que el QR físico existe y está libre
+        cursor.execute("SELECT Activo FROM qrs WHERE `Key` = %s", (venta.qr_key,))
+        qr = cursor.fetchone()
+        if not qr:
+            return {"status": "error", "message": f"El QR {venta.qr_key} no existe."}
+        if qr['Activo'] == 1:
+            return {"status": "error", "message": f"El QR {venta.qr_key} ya está asignado."}
+
+        # 2. Generar clave única random (reintenta si ya existe)
+        clave = None
+        for _ in range(10):
+            candidata = _generar_clave()
+            cursor.execute("SELECT 1 FROM ventas WHERE Clave_Generada = %s", (candidata,))
+            if not cursor.fetchone():
+                clave = candidata
+                break
+        if not clave:
+            return {"status": "error", "message": "No se pudo generar una clave única."}
+
+        # 3. Guardar la venta con QR_Key y clave separados
+        cursor.execute(
+            """INSERT INTO ventas
+               (Nombre_Cliente, Email_Cliente, Clave_Generada, Total, Metodo_Pago, Detalle, QR_Key)
+               VALUES (%s, %s, %s, %s, %s, %s, %s)""",
+            (venta.to_name, venta.to_email, clave,
+             venta.total, venta.metodo_pago, venta.detalle, venta.qr_key)
+        )
+        conexion.commit()
+
+        # 4. Enviar correo con la clave al comprador
+        correo_enviado = enviar_clave_activacion(
+            nombre=venta.to_name,
+            email_destino=venta.to_email,
+            clave=clave,
+            qr_key=venta.qr_key
+        )
+
+        return {
+            "status": "ok",
+            "clave_generada": clave,          # por si lo necesitas en el frontend
+            "correo_enviado": correo_enviado  # True/False
+        }
+
+    except Exception as e:
+        if conexion:
+            conexion.rollback()
+        return {"status": "error", "message": str(e)}
+    finally:
+        if conexion:
+            conexion.close()
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Modelo DatosVenta actualizado (reemplaza el tuyo)
+# ─────────────────────────────────────────────────────────────────────────────
+
+# class DatosVenta(BaseModel):
+#     to_name: str
+#     to_email: str
+#     total: str
+#     metodo_pago: str
+#     detalle: str
+#     qr_key: str     # ← ID del QR físico de la pulsera (ej: MQR001)
+#                     # la clave ya no viene del frontend, se genera aquí
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Función generadora de clave (agrégala arriba de /web/venta en main.py)
+# ─────────────────────────────────────────────────────────────────────────────
+
+# import random, string
+#
+# def _generar_clave(longitud: int = 8) -> str:
+#     chars = string.ascii_uppercase + string.digits
+#     return ''.join(random.choices(chars, k=longitud))
 # ─────────────────────────────────────────────────────────────────────────────
 # QR LEGACY — por ID_Ficha (se mantiene para compatibilidad)
 # ─────────────────────────────────────────────────────────────────────────────
