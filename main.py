@@ -149,6 +149,32 @@ def login_app(datos: ValidarAcceso):
     finally:
         if 'conexion' in locals(): conexion.close()
 
+#flutter formularios
+@app.post("/paciente/completo")
+def registrar_todo_el_perfil(data: dict):
+    # 1. Insertar en tabla 'personas' (Datos comunes)
+    cursor.execute(
+        "INSERT INTO personas (Nombre, Apellido, Edad, DUI, Huella_ID) VALUES (%s, %s, %s, %s, %s)",
+        (data['nombre'], data['apellido'], data['edad'], data.get('dui'), data['huella_id'])
+    )
+    id_persona = cursor.lastrowid
+
+    # 2. Insertar en tabla 'fichas_medicas' (Lo que sale en el QR)
+    cursor.execute(
+        "INSERT INTO fichas_medicas (ID_Persona, Sangre, Alergias, Medicamentos, Enfermedades) VALUES (%s, %s, %s, %s, %s)",
+        (id_persona, data['tipo_sangre'], data['alergias'], data['medicamentos'], data['enfermedades'])
+    )
+
+    # 3. Lógica para tablas específicas (Niños / Adultos Mayores)
+    if data['tipo_paciente'] == "Niño":
+        cursor.execute(
+            "INSERT INTO responsables (ID_Persona, Nombre_Resp, Telefono_Resp) VALUES (%s, %s, %s)",
+            (id_persona, data['responsable'], data['telefono_responsable'])
+        )
+
+    conn.commit() # Guardar cambios en Railway
+    return {"status": "ok", "id": id_persona}
+
 @app.post("/qr/registrar")
 def registrar_paciente(datos: DatosPaciente):
     try:
