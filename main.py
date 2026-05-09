@@ -86,7 +86,6 @@ def descargar_factura(clave: str, nombre: str = "Cliente", total: str = "0.00", 
         pdf.set_text_color(0, 0, 0)
         pdf.set_font("Arial", "", 10)
         
-        # Procesar los productos (Roja|5;Negra|5)
         if items:
             for fila in items.split(";"):
                 if "|" in fila:
@@ -99,20 +98,17 @@ def descargar_factura(clave: str, nombre: str = "Cliente", total: str = "0.00", 
         pdf.cell(140, 10, "TOTAL PAGADO: ", align="R")
         pdf.cell(50, 10, f"${total}", ln=True, align="C")
 
-        # --- CLAVE GIGANTE ---
         pdf.ln(10)
         pdf.set_font("Arial", "B", 26)
         pdf.set_text_color(198, 40, 40)
         pdf.cell(190, 15, clave, ln=True, align="C")
 
-     # --- EL PARCHE DEFINITIVO (SIN .ENCODE) ---
         output = pdf.output(dest='S')
         
-        # Convertimos a bytes puro, sin importar si viene como string o bytearray
         if isinstance(output, str):
             final_payload = bytes(output, 'latin-1')
         else:
-            final_payload = bytes(output) # Esto convierte bytearray a bytes limpios
+            final_payload = bytes(output) 
 
         return Response(
             content=final_payload,
@@ -121,6 +117,7 @@ def descargar_factura(clave: str, nombre: str = "Cliente", total: str = "0.00", 
         )
     except Exception as e:
         return {"status": "error", "message": str(e)}
+
 # --- RUTAS DEL APP / QR ---
 
 @app.post("/app/login")
@@ -147,11 +144,9 @@ def login_app(datos: ValidarAcceso):
     except Exception as e:
         return {"status": "error", "message": str(e)}
     finally:
-        if 'conexion' in locals(): conexion.close()
+        if 'conexion' in locals() and conexion: conexion.close()
 
-#flutter formularios
-# --- AGREGÁ ESTO O REEMPLAZÁ TU FUNCIÓN ---
-
+# --- REGISTRO COMPLETO DESDE FLUTTER ---
 @app.post("/paciente/completo")
 def registrar_todo_el_perfil(data: dict):
     conexion = None
@@ -159,8 +154,6 @@ def registrar_todo_el_perfil(data: dict):
         conexion = conectar()
         cursor = conexion.cursor()
 
-        # 1. Insertar en tabla 'personas'
-        # Basado en tu foto: ID_Personas es la PK
         sql_persona = """
             INSERT INTO personas 
             (Tipo, Nombre, Apellido, Edad, DUI, Telefono, Responsable_Nombre, Responsable_Telefono) 
@@ -179,12 +172,30 @@ def registrar_todo_el_perfil(data: dict):
         )
 
         cursor.execute(sql_persona, valores_p)
-        id_persona = cursor.lastrowid # Este es el ID_Personas generado
+        id_persona = cursor.lastrowid 
 
-        # 2. Insertar en tabla 'fichas_medicas'
-        # IMPORTANTE: Aquí cambiamos a ID_Personas (con 's') para que coincida con tu FK
         sql_ficha = """
-            INSERT INTO fichas_medicas (ID_Persona, Tipo_Sangre,
+            INSERT INTO fichas_medicas (ID_Persona, Tipo_Sangre, Alergias, Observaciones) 
+            VALUES (%s, %s, %s, %s)
+        """
+        
+        obs = f"Med: {data.get('medicamentos')} | Enf: {data.get('enfermedades')}"
+        
+        cursor.execute(sql_ficha, (
+            id_persona, 
+            data.get('tipo_sangre', 'N/A'), 
+            data.get('alergias', 'Ninguna'), 
+            obs
+        ))
+
+        conexion.commit()
+        return {"status": "ok", "id": id_persona}
+    except Exception as e:
+        if conexion: conexion.rollback()
+        return {"status": "error", "message": str(e)}
+    finally:
+        if conexion: conexion.close()
+
 @app.post("/qr/registrar")
 def registrar_paciente(datos: DatosPaciente):
     try:
@@ -201,32 +212,43 @@ def registrar_paciente(datos: DatosPaciente):
     except Exception as e:
         return {"status": "error", "message": str(e)}
 
+# --- LINK DE LA FICHA (DISEÑO TARJETA) ---
 @app.get("/qr/ficha/{id}", response_class=HTMLResponse)
 def ficha_qr(id: str):
     try:
         conexion = conectar()
         cursor = conexion.cursor(pymysql.cursors.DictCursor)
         sql = """SELECT p.Nombre, p.Apellido, f.Tipo_Sangre, f.Alergias, f.Observaciones 
-                 FROM fichas_medicas f JOIN personas p ON f.ID_Persona = p.ID_Personas WHERE f.ID_Ficha = %s"""
+                 FROM fichas_medicas f 
+                 JOIN personas p ON f.ID_Persona = p.ID_Personas 
+                 WHERE f.ID_Ficha = %s"""
         cursor.execute(sql, (id,))
         d = cursor.fetchone()
         conexion.close()
+        
         if not d: return "<h1>No encontrado</h1>"
-        return f"""
+        
+        # HTML corregido sin f-strings para evitar SyntaxError en Render
+        html_content = """
         <html><head><meta name="viewport" content="width=device-width, initial-scale=1.0">
-        <style>body{{font-family:Arial;background:#f2f2f2;padding:20px;}}
-        .card{{background:white;padding:25px;border-radius:20px;max-width:350px;margin:auto;box-shadow:0 4px 15px rgba(0,0,0,0.2);border-top:10px solid #d32f2f;}}
-        .title{{text-align:center;font-size:24px;font-weight:bold;margin-bottom:20px;color:#d32f2f;}}
-        .info{{margin:15px 0;border-bottom:1px solid #eee;padding-bottom:5px;}}
-        .label{{color:#d32f2f;font-weight:bold;font-size:12px;text-transform:uppercase;display:block;}}
-        .btn{{display:block;padding:15px;margin-top:10px;border-radius:10px;text-decoration:none;color:white;text-align:center;font-weight:bold;background:#d32f2f;}}
-        .btn-1{{display:block;padding:15px;margin-top:10px;border-radius:10px;text-decoration:none;color:white;text-align:center;font-weight:bold;background:blue;}}</style>
+        <style>
+            body { font-family:Arial; background:#f2f2f2; padding:20px; }
+            .card { background:white; padding:25px; border-radius:20px; max-width:350px; margin:auto; box-shadow:0 4px 15px rgba(0,0,0,0.2); border-top:10px solid #d32f2f; }
+            .title { text-align:center; font-size:24px; font-weight:bold; margin-bottom:20px; color:#d32f2f; }
+            .info { margin:15px 0; border-bottom:1px solid #eee; padding-bottom:5px; }
+            .label { color:#d32f2f; font-weight:bold; font-size:12px; text-transform:uppercase; display:block; }
+            .btn { display:block; padding:15px; margin-top:10px; border-radius:10px; text-decoration:none; color:white; text-align:center; font-weight:bold; background:#d32f2f; }
+            .btn-1 { display:block; padding:15px; margin-top:10px; border-radius:10px; text-decoration:none; color:white; text-align:center; font-weight:bold; background:blue; }
+        </style>
         </head><body><div class="card"><div class="title">🚑 Ficha Médica</div>
-        <div class="info"><span class="label">Nombre</span> {d['Nombre']} {d['Apellido']}</div>
-        <div class="info"><span class="label">Sangre</span> {d['Tipo_Sangre']}</div>
-        <div class="info"><span class="label">Alergias</span> {d['Alergias']}</div>
-        <div class="info"><span class="label">Notas</span> {d['Observaciones']}</div>
+        <div class="info"><span class="label">Nombre</span> %s %s</div>
+        <div class="info"><span class="label">Sangre</span> %s</div>
+        <div class="info"><span class="label">Alergias</span> %s</div>
+        <div class="info"><span class="label">Notas</span> %s</div>
         <a class="btn" href="tel:911">📞 EMERGENCIAS (911)</a>
-        <a class="btn-1" href="tel:132">📞 SEM (132)</a></div></body></html>"""
+        <a class="btn-1" href="tel:132">📞 SEM (132)</a></div></body></html>
+        """ % (d['Nombre'], d['Apellido'], d['Tipo_Sangre'], d['Alergias'], d['Observaciones'])
+        
+        return html_content
     except Exception as e:
         return f"<h1>Error: {str(e)}</h1>"
