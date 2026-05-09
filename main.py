@@ -7,6 +7,10 @@ from fastapi.middleware.cors import CORSMiddleware
 from fpdf import FPDF
 import io
 import random, string
+import smtplib
+from email.mime.multipart import MIMEMultipart
+from email.mime.text import MIMEText
+
 
 app = FastAPI()
 
@@ -17,7 +21,125 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+GMAIL_USER  →  diagnosticomedqr@gmail.com
+GMAIL_PASS  →  INFRAMEN2026
 
+GMAIL_USER = os.getenv("GMAIL_USER", "")
+GMAIL_PASS = os.getenv("GMAIL_PASS", "")
+ 
+ 
+def enviar_clave_activacion(nombre: str, email_destino: str, clave: str, qr_key: str) -> bool:
+    """
+    Envía el correo con la clave de activación al comprador.
+    Retorna True si se envió correctamente, False si falló.
+    """
+    try:
+        msg = MIMEMultipart("alternative")
+        msg["Subject"] = "🚑 Tu Pulsera MedQR está lista para activar"
+        msg["From"]    = f"MedQR <{GMAIL_USER}>"
+        msg["To"]      = email_destino
+ 
+        html = f"""
+        <!DOCTYPE html>
+        <html lang="es">
+        <head><meta charset="UTF-8"></head>
+        <body style="margin:0;padding:0;background:#f0f4f8;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif">
+          <table width="100%" cellpadding="0" cellspacing="0">
+            <tr><td align="center" style="padding:40px 16px">
+              <table width="100%" style="max-width:480px;background:#ffffff;border-radius:20px;overflow:hidden;box-shadow:0 4px 20px rgba(0,0,0,.10)">
+ 
+                <!-- Header -->
+                <tr>
+                  <td style="background:#c62828;padding:32px 32px 24px;text-align:center">
+                    <div style="font-size:48px">🚑</div>
+                    <h1 style="color:#ffffff;font-size:22px;font-weight:700;margin:10px 0 4px">¡Tu pulsera está lista!</h1>
+                    <p style="color:rgba(255,255,255,.8);font-size:14px;margin:0">MedQR — Ficha Médica Inteligente</p>
+                  </td>
+                </tr>
+ 
+                <!-- Body -->
+                <tr>
+                  <td style="padding:32px">
+                    <p style="color:#333;font-size:15px;margin:0 0 8px">Hola, <strong>{nombre}</strong> 👋</p>
+                    <p style="color:#555;font-size:14px;line-height:1.6;margin:0 0 28px">
+                      Tu pulsera inteligente MedQR ha sido registrada. Para activarla e ingresar tus datos médicos, abre la aplicación e ingresa con las siguientes credenciales:
+                    </p>
+ 
+                    <!-- Credenciales -->
+                    <table width="100%" style="background:#f8f8f8;border-radius:12px;margin-bottom:28px">
+                      <tr>
+                        <td style="padding:20px 24px">
+                          <p style="margin:0 0 14px;font-size:12px;color:#999;text-transform:uppercase;letter-spacing:.5px;font-weight:700">Correo electrónico</p>
+                          <p style="margin:0 0 20px;font-size:15px;color:#222;font-weight:600">{email_destino}</p>
+ 
+                          <p style="margin:0 0 10px;font-size:12px;color:#999;text-transform:uppercase;letter-spacing:.5px;font-weight:700">Clave de activación</p>
+                          <div style="background:#c62828;border-radius:10px;padding:14px 20px;text-align:center">
+                            <span style="color:#ffffff;font-size:28px;font-weight:800;letter-spacing:4px;font-family:monospace">{clave}</span>
+                          </div>
+                        </td>
+                      </tr>
+                    </table>
+ 
+                    <!-- Pasos -->
+                    <p style="font-size:13px;font-weight:700;color:#333;margin:0 0 12px;text-transform:uppercase;letter-spacing:.4px">Cómo activar</p>
+                    <table width="100%">
+                      <tr>
+                        <td style="padding:6px 0;font-size:14px;color:#555">
+                          <span style="background:#c62828;color:#fff;border-radius:50%;width:22px;height:22px;display:inline-flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;margin-right:10px">1</span>
+                          Abre la app MedQR en tu celular
+                        </td>
+                      </tr>
+                      <tr>
+                        <td style="padding:6px 0;font-size:14px;color:#555">
+                          <span style="background:#c62828;color:#fff;border-radius:50%;width:22px;height:22px;display:inline-flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;margin-right:10px">2</span>
+                          Ingresa tu correo y la clave de arriba
+                        </td>
+                      </tr>
+                      <tr>
+                        <td style="padding:6px 0;font-size:14px;color:#555">
+                          <span style="background:#c62828;color:#fff;border-radius:50%;width:22px;height:22px;display:inline-flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;margin-right:10px">3</span>
+                          Completa tu ficha médica
+                        </td>
+                      </tr>
+                      <tr>
+                        <td style="padding:6px 0;font-size:14px;color:#555">
+                          <span style="background:#1565c0;color:#fff;border-radius:50%;width:22px;height:22px;display:inline-flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;margin-right:10px">✓</span>
+                          ¡Tu QR estará activo!
+                        </td>
+                      </tr>
+                    </table>
+ 
+                    <p style="font-size:12px;color:#aaa;margin:28px 0 0;line-height:1.5">
+                      Guarda bien tu clave de activación. Si tienes problemas, responde este correo.
+                    </p>
+                  </td>
+                </tr>
+ 
+                <!-- Footer -->
+                <tr>
+                  <td style="background:#f8f8f8;padding:18px 32px;text-align:center;border-top:1px solid #eee">
+                    <p style="font-size:12px;color:#bbb;margin:0">© MedQR — Pulsera Médica Inteligente</p>
+                  </td>
+                </tr>
+ 
+              </table>
+            </td></tr>
+          </table>
+        </body>
+        </html>
+        """
+ 
+        msg.attach(MIMEText(html, "html"))
+ 
+        with smtplib.SMTP_SSL("smtp.gmail.com", 465) as server:
+            server.login(GMAIL_USER, GMAIL_PASS)
+            server.sendmail(GMAIL_USER, email_destino, msg.as_string())
+ 
+        return True
+ 
+    except Exception as e:
+        print(f"Error enviando correo a {email_destino}: {e}")
+        return False
 # ─────────────────────────────────────────────────────────────────────────────
 # MODELOS
 # ─────────────────────────────────────────────────────────────────────────────
