@@ -329,3 +329,208 @@ def ficha_qr(id: str):
         return html_content
     except Exception as e:
         return f"<h1>Error: {str(e)}</h1>"
+
+# ─────────────────────────────────────────────────────────────────────────────
+# AGREGAR ESTE ENDPOINT A TU main.py (o donde tengas tu FastAPI)
+#
+# URL del QR impreso: https://tu-api.onrender.com/qr/ver/{clave}
+# Ejemplo:            https://tu-api.onrender.com/qr/ver/MQR001
+#
+# Cadena de búsqueda:
+#   clave → ventas (Clave_Generada) → Email_Cliente
+#         → personas (Nombre+Apellido) → fichas_medicas → HTML
+# ─────────────────────────────────────────────────────────────────────────────
+
+@app.get("/qr/ver/{clave}", response_class=HTMLResponse)
+def ver_ficha_por_clave(clave: str):
+    conexion = None
+    try:
+        conexion = conectar()
+        cursor = conexion.cursor(pymysql.cursors.DictCursor)
+
+        # 1. Verificar que el QR existe y está activo
+        cursor.execute("SELECT Activo FROM qrs WHERE `Key` = %s", (clave,))
+        qr = cursor.fetchone()
+
+        if not qr:
+            return _html_error("QR no registrado", "Este código QR no está en el sistema.")
+
+        if qr['Activo'] == 0:
+            return _html_inactivo(clave)
+
+        # 2. Buscar el email asociado a esa clave en ventas
+        cursor.execute(
+            "SELECT Nombre_Cliente, Email_Cliente FROM ventas WHERE Clave_Generada = %s LIMIT 1",
+            (clave,)
+        )
+        venta = cursor.fetchone()
+        if not venta:
+            return _html_error("Sin datos", "No hay venta asociada a este QR.")
+
+        # 3. Buscar persona + ficha médica por nombre (igual que en _obtener_paciente_por_email)
+        nombre_completo = venta['Nombre_Cliente'].split(' ', 1)
+        nombre   = nombre_completo[0]
+        apellido = nombre_completo[1] if len(nombre_completo) > 1 else ''
+
+        cursor.execute(
+            """SELECT p.Nombre, p.Apellido, p.Edad, p.Tipo,
+                      p.Responsable_Nombre, p.Responsable_Telefono,
+                      f.Tipo_Sangre, f.Alergias, f.Observaciones
+               FROM personas p
+               LEFT JOIN fichas_medicas f ON f.ID_Persona = p.ID_Personas
+               WHERE p.Nombre = %s AND p.Apellido = %s
+               ORDER BY p.ID_Personas DESC LIMIT 1""",
+            (nombre, apellido)
+        )
+        d = cursor.fetchone()
+
+        if not d or not d.get('Tipo_Sangre'):
+            return _html_sin_ficha(venta['Nombre_Cliente'])
+
+        return _html_ficha(d)
+
+    except Exception as e:
+        return _html_error("Error del servidor", str(e))
+    finally:
+        if conexion:
+            conexion.close()
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# HELPERS HTML — respuestas visuales del QR
+# ─────────────────────────────────────────────────────────────────────────────
+
+def _base_html(titulo: str, cuerpo: str) -> str:
+    return f"""<!DOCTYPE html>
+<html lang="es"><head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>{titulo}</title>
+<style>
+  *{{box-sizing:border-box;margin:0;padding:0}}
+  body{{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
+       background:#f0f4f8;min-height:100vh;display:flex;align-items:center;justify-content:center;padding:16px}}
+  .card{{background:#fff;border-radius:20px;max-width:380px;width:100%;
+         box-shadow:0 8px 30px rgba(0,0,0,.12);overflow:hidden}}
+  .header{{background:#c62828;padding:20px;text-align:center;color:#fff}}
+  .header h1{{font-size:18px;font-weight:700;margin-top:6px}}
+  .header .icon{{font-size:36px}}
+  .body{{padding:20px}}
+  .row{{display:flex;flex-direction:column;padding:10px 0;border-bottom:1px solid #f0f0f0}}
+  .row:last-child{{border-bottom:none}}
+  .label{{font-size:11px;font-weight:700;color:#c62828;text-transform:uppercase;letter-spacing:.5px;margin-bottom:3px}}
+  .value{{font-size:15px;color:#1a1a1a;font-weight:500}}
+  .badge{{display:inline-block;padding:3px 10px;border-radius:20px;font-size:12px;font-weight:600;margin-bottom:12px}}
+  .badge-nino{{background:#e3f2fd;color:#1565c0}}
+  .badge-adulto{{background:#e8f5e9;color:#2e7d32}}
+  .badge-mayor{{background:#fff3e0;color:#e65100}}
+  .btns{{padding:16px;display:flex;flex-direction:column;gap:10px}}
+  .btn{{display:block;padding:14px;border-radius:12px;text-decoration:none;
+        color:#fff;text-align:center;font-weight:700;font-size:15px}}
+  .btn-911{{background:#c62828}}
+  .btn-132{{background:#1565c0}}
+  .alert{{padding:20px;text-align:center;color:#555}}
+  .alert .big{{font-size:48px;margin-bottom:10px}}
+  .alert h2{{font-size:17px;color:#333;margin-bottom:6px}}
+  .alert p{{font-size:13px;color:#888}}
+</style>
+</head><body>{cuerpo}</body></html>"""
+
+
+def _html_ficha(d: dict) -> str:
+    tipo = d.get('Tipo', 'Adulto')
+    badge_class = 'badge-nino' if 'ni' in tipo.lower() else ('badge-mayor' if 'mayor' in tipo.lower() else 'badge-adulto')
+
+    responsable = ''
+    if d.get('Responsable_Nombre'):
+        responsable = f"""
+        <div class="row">
+          <span class="label">Contacto de emergencia</span>
+          <span class="value">{d['Responsable_Nombre']}</span>
+        </div>
+        <div class="row">
+          <span class="label">Teléfono</span>
+          <span class="value"><a href="tel:{d['Responsable_Telefono']}" style="color:#c62828">{d['Responsable_Telefono']}</a></span>
+        </div>"""
+
+    cuerpo = f"""
+    <div class="card">
+      <div class="header">
+        <div class="icon">🚑</div>
+        <h1>Ficha Médica de Emergencia</h1>
+      </div>
+      <div class="body">
+        <span class="badge {badge_class}">{tipo}</span>
+        <div class="row">
+          <span class="label">Paciente</span>
+          <span class="value">{d['Nombre']} {d['Apellido']}</span>
+        </div>
+        <div class="row">
+          <span class="label">Edad</span>
+          <span class="value">{d.get('Edad', 'N/A')} años</span>
+        </div>
+        <div class="row">
+          <span class="label">Tipo de sangre</span>
+          <span class="value" style="font-size:22px;color:#c62828;font-weight:800">{d['Tipo_Sangre']}</span>
+        </div>
+        <div class="row">
+          <span class="label">Alergias</span>
+          <span class="value">{d['Alergias'] or 'Ninguna'}</span>
+        </div>
+        <div class="row">
+          <span class="label">Observaciones</span>
+          <span class="value">{d['Observaciones'] or 'Ninguna'}</span>
+        </div>
+        {responsable}
+      </div>
+      <div class="btns">
+        <a class="btn btn-911" href="tel:911">📞 Emergencias — 911</a>
+        <a class="btn btn-132" href="tel:132">🚑 SEM — 132</a>
+      </div>
+    </div>"""
+    return _base_html("Ficha Médica", cuerpo)
+
+
+def _html_inactivo(clave: str) -> str:
+    cuerpo = f"""
+    <div class="card">
+      <div class="header"><div class="icon">🔒</div><h1>Pulsera no activada</h1></div>
+      <div class="body">
+        <div class="alert">
+          <div class="big">⏳</div>
+          <h2>QR pendiente de activación</h2>
+          <p>El propietario de esta pulsera aún no ha ingresado sus datos médicos en la aplicación.</p>
+        </div>
+      </div>
+    </div>"""
+    return _base_html("Sin activar", cuerpo)
+
+
+def _html_sin_ficha(nombre: str) -> str:
+    cuerpo = f"""
+    <div class="card">
+      <div class="header"><div class="icon">📋</div><h1>Datos incompletos</h1></div>
+      <div class="body">
+        <div class="alert">
+          <div class="big">⚠️</div>
+          <h2>{nombre}</h2>
+          <p>El propietario aún no ha completado su ficha médica en la app.</p>
+        </div>
+      </div>
+      <div class="btns">
+        <a class="btn btn-911" href="tel:911">📞 Emergencias — 911</a>
+        <a class="btn btn-132" href="tel:132">🚑 SEM — 132</a>
+      </div>
+    </div>"""
+    return _base_html("Sin ficha", cuerpo)
+
+
+def _html_error(titulo: str, detalle: str) -> str:
+    cuerpo = f"""
+    <div class="card">
+      <div class="header"><div class="icon">❌</div><h1>{titulo}</h1></div>
+      <div class="body">
+        <div class="alert"><p>{detalle}</p></div>
+      </div>
+    </div>"""
+    return _base_html("Error", cuerpo)
