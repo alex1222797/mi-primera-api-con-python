@@ -1,7 +1,7 @@
 fastapi
 uvicorn
 pymysql
-pydantic
 cryptography
+pydantic
+fpdf
 python-multipart
-fpdf2
