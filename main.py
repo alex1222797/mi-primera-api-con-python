@@ -156,58 +156,52 @@ def login_app(datos: ValidarAcceso):
 def registrar_todo_el_perfil(data: dict):
     conexion = None
     try:
-        conexion = conectar() # Usamos tu función conectar()
+        conexion = conectar()
         cursor = conexion.cursor()
 
-        # 1. Insertar en tabla 'personas'
-        # Ajustado a tus fotos: Nombre, Apellido, Edad, DUI, Correo, Huella_ID
+        # QUITAMOS Huella_ID del SQL para que no de error
+        # Usamos exactamente las columnas que vi en tu captura de Railway
         sql_persona = """
-            INSERT INTO personas (Nombre, Apellido, Edad, DUI, Huella_ID) 
-            VALUES (%s, %s, %s, %s, %s)
+            INSERT INTO personas 
+            (Tipo, Nombre, Apellido, Edad, DUI, Telefono, Responsable_Nombre, Responsable_Telefono) 
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
         """
-        cursor.execute(sql_persona, (
-            data['nombre'], 
-            data['apellido'], 
-            data['edad'], 
-            data.get('dui'), 
-            data.get('huella_id', 'SIN_HUELLA')
-        ))
+        
+        valores_p = (
+            data.get('tipo_paciente'), 
+            data.get('nombre'),
+            data.get('apellido'),
+            data.get('edad'),
+            data.get('dui'),
+            data.get('telefono_responsable'), # O el telefono que uses
+            data.get('responsable'), 
+            data.get('telefono_responsable')
+        )
+
+        cursor.execute(sql_persona, valores_p)
         id_persona = cursor.lastrowid
 
-        # 2. Insertar en tabla 'fichas_medicas'
-        # Usamos Persona_ID como FK según la estructura lógica
+        # 2. Insertar en fichas_medicas
         sql_ficha = """
             INSERT INTO fichas_medicas (ID_Persona, Tipo_Sangre, Alergias, Observaciones) 
             VALUES (%s, %s, %s, %s)
         """
-        # Unimos Medicamentos y Enfermedades en 'Observaciones' para que quepa en tu tabla actual
-        obs_combinada = f"Med: {data['medicamentos']} | Enf: {data['enfermedades']}"
+        # Metemos medicamentos y enfermedades en Observaciones para ahorrar espacio
+        obs = f"Med: {data.get('medicamentos')} | Enf: {data.get('enfermedades')}"
         
         cursor.execute(sql_ficha, (
             id_persona, 
-            data['tipo_sangre'], 
-            data['alergias'], 
-            obs_combinada
+            data.get('tipo_sangre'), 
+            data.get('alergias'), 
+            obs
         ))
-
-        # 3. Lógica para responsables (Niños / Adultos Mayores)
-        if data['tipo_paciente'] in ["Niño", "Adulto Mayor"]:
-            sql_resp = """
-                INSERT INTO responsables (ID_Persona, Nombre_Resp, Telefono_Resp) 
-                VALUES (%s, %s, %s)
-            """
-            cursor.execute(sql_resp, (
-                id_persona, 
-                data['responsable'], 
-                data['telefono_responsable']
-            ))
 
         conexion.commit()
         return {"status": "ok", "id": id_persona}
 
     except Exception as e:
         if conexion: conexion.rollback()
-        print(f"Error: {str(e)}")
+        print(f"Error real: {str(e)}") # Esto saldrá en los logs de Render
         return {"status": "error", "message": str(e)}
     finally:
         if conexion: conexion.close()
