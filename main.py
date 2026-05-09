@@ -145,8 +145,6 @@ def login_app(datos: ValidarAcceso):
         return {"status": "error", "message": str(e)}
     finally:
         if 'conexion' in locals() and conexion: conexion.close()
-
-# --- REGISTRO COMPLETO DESDE FLUTTER ---
 @app.post("/paciente/completo")
 def registrar_todo_el_perfil(data: dict):
     conexion = None
@@ -154,12 +152,14 @@ def registrar_todo_el_perfil(data: dict):
         conexion = conectar()
         cursor = conexion.cursor()
 
+        # 1. Insertar en tabla 'personas'
         sql_persona = """
             INSERT INTO personas 
-            (Tipo, Nombre, Apellido, Edad, DUI, Telefono, Responsable_Nombre, Responsable_Telefono) 
+            (Tipo, Nombre, Appellido, Edad, DUI, Telefono, Responsable_Nombre, Responsable_Telefono) 
             VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
         """
         
+        # OJO: Verifica si en tu DB es 'Appellido' con doble 'p' como en una de tus capturas
         valores_p = (
             data.get('tipo_paciente'), 
             data.get('nombre'),
@@ -174,12 +174,14 @@ def registrar_todo_el_perfil(data: dict):
         cursor.execute(sql_persona, valores_p)
         id_persona = cursor.lastrowid 
 
+        # 2. Insertar en tabla 'fichas_medicas'
+        # USAMOS EL NOMBRE EXACTO: ID_Personas
         sql_ficha = """
-            INSERT INTO fichas_medicas (ID_Persona, Tipo_Sangre, Alergias, Observaciones) 
+            INSERT INTO fichas_medicas (ID_Personas, Tipo_Sangre, Alergias, Observaciones) 
             VALUES (%s, %s, %s, %s)
         """
         
-        obs = f"Med: {data.get('medicamentos')} | Enf: {data.get('enfermedades')}"
+        obs = f"Med: {data.get('medicamentos', '')} | Enf: {data.get('enfermedades', '')}"
         
         cursor.execute(sql_ficha, (
             id_persona, 
@@ -190,12 +192,12 @@ def registrar_todo_el_perfil(data: dict):
 
         conexion.commit()
         return {"status": "ok", "id": id_persona}
+
     except Exception as e:
         if conexion: conexion.rollback()
         return {"status": "error", "message": str(e)}
     finally:
         if conexion: conexion.close()
-
 @app.post("/qr/registrar")
 def registrar_paciente(datos: DatosPaciente):
     try:
