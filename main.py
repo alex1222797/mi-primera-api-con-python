@@ -6,6 +6,7 @@ from fastapi.responses import HTMLResponse
 from fastapi.middleware.cors import CORSMiddleware
 from fpdf import FPDF
 import io
+import random, string
 
 app = FastAPI()
 
@@ -22,12 +23,12 @@ app.add_middleware(
 # ─────────────────────────────────────────────────────────────────────────────
 
 class DatosVenta(BaseModel):
-    to_name: str
-    to_email: str
-    to_clave: str
-    total: str
-    metodo_pago: str
-    detalle: str
+     to_name: str
+     to_email: str
+     total: str
+     metodo_pago: str
+     detalle: str
+     qr_key: str
 
 class DatosPaciente(BaseModel):
     nombre: str
@@ -220,7 +221,9 @@ def registrar_todo_el_perfil(data: dict):
 # ─────────────────────────────────────────────────────────────────────────────
 # VENTA — registra venta y crea el QR en estado OFF
 # ─────────────────────────────────────────────────────────────────────────────
-
+def _generar_clave(longitud: int = 8) -> str:
+     chars = string.ascii_uppercase + string.digits
+     return ''.join(random.choices(chars, k=longitud))
 @app.post("/web/venta")
 def registrar_venta(venta: DatosVenta):
     try:
