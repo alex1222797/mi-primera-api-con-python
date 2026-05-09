@@ -155,7 +155,7 @@ def registrar_todo_el_perfil(data: dict):
         # 1. Insertar en tabla 'personas'
         sql_persona = """
             INSERT INTO personas 
-            (Tipo, Nombre, Appellido, Edad, DUI, Telefono, Responsable_Nombre, Responsable_Telefono) 
+            (Tipo, Nombre, Apellido, Edad, DUI, Telefono, Responsable_Nombre, Responsable_Telefono) 
             VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
         """
         
