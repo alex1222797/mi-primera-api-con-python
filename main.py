@@ -150,31 +150,67 @@ def login_app(datos: ValidarAcceso):
         if 'conexion' in locals(): conexion.close()
 
 #flutter formularios
+# --- AGREGÁ ESTO O REEMPLAZÁ TU FUNCIÓN ---
+
 @app.post("/paciente/completo")
 def registrar_todo_el_perfil(data: dict):
-    # 1. Insertar en tabla 'personas' (Datos comunes)
-    cursor.execute(
-        "INSERT INTO personas (Nombre, Apellido, Edad, DUI, Huella_ID) VALUES (%s, %s, %s, %s, %s)",
-        (data['nombre'], data['apellido'], data['edad'], data.get('dui'), data['huella_id'])
-    )
-    id_persona = cursor.lastrowid
+    conexion = None
+    try:
+        conexion = conectar() # Usamos tu función conectar()
+        cursor = conexion.cursor()
 
-    # 2. Insertar en tabla 'fichas_medicas' (Lo que sale en el QR)
-    cursor.execute(
-        "INSERT INTO fichas_medicas (ID_Persona, Sangre, Alergias, Medicamentos, Enfermedades) VALUES (%s, %s, %s, %s, %s)",
-        (id_persona, data['tipo_sangre'], data['alergias'], data['medicamentos'], data['enfermedades'])
-    )
+        # 1. Insertar en tabla 'personas'
+        # Ajustado a tus fotos: Nombre, Apellido, Edad, DUI, Correo, Huella_ID
+        sql_persona = """
+            INSERT INTO personas (Nombre, Apellido, Edad, DUI, Huella_ID) 
+            VALUES (%s, %s, %s, %s, %s)
+        """
+        cursor.execute(sql_persona, (
+            data['nombre'], 
+            data['apellido'], 
+            data['edad'], 
+            data.get('dui'), 
+            data.get('huella_id', 'SIN_HUELLA')
+        ))
+        id_persona = cursor.lastrowid
 
-    # 3. Lógica para tablas específicas (Niños / Adultos Mayores)
-    if data['tipo_paciente'] == "Niño":
-        cursor.execute(
-            "INSERT INTO responsables (ID_Persona, Nombre_Resp, Telefono_Resp) VALUES (%s, %s, %s)",
-            (id_persona, data['responsable'], data['telefono_responsable'])
-        )
+        # 2. Insertar en tabla 'fichas_medicas'
+        # Usamos Persona_ID como FK según la estructura lógica
+        sql_ficha = """
+            INSERT INTO fichas_medicas (ID_Persona, Tipo_Sangre, Alergias, Observaciones) 
+            VALUES (%s, %s, %s, %s)
+        """
+        # Unimos Medicamentos y Enfermedades en 'Observaciones' para que quepa en tu tabla actual
+        obs_combinada = f"Med: {data['medicamentos']} | Enf: {data['enfermedades']}"
+        
+        cursor.execute(sql_ficha, (
+            id_persona, 
+            data['tipo_sangre'], 
+            data['alergias'], 
+            obs_combinada
+        ))
 
-    conn.commit() # Guardar cambios en Railway
-    return {"status": "ok", "id": id_persona}
+        # 3. Lógica para responsables (Niños / Adultos Mayores)
+        if data['tipo_paciente'] in ["Niño", "Adulto Mayor"]:
+            sql_resp = """
+                INSERT INTO responsables (ID_Persona, Nombre_Resp, Telefono_Resp) 
+                VALUES (%s, %s, %s)
+            """
+            cursor.execute(sql_resp, (
+                id_persona, 
+                data['responsable'], 
+                data['telefono_responsable']
+            ))
 
+        conexion.commit()
+        return {"status": "ok", "id": id_persona}
+
+    except Exception as e:
+        if conexion: conexion.rollback()
+        print(f"Error: {str(e)}")
+        return {"status": "error", "message": str(e)}
+    finally:
+        if conexion: conexion.close()
 @app.post("/qr/registrar")
 def registrar_paciente(datos: DatosPaciente):
     try:
