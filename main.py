@@ -152,51 +152,41 @@ def registrar_todo_el_perfil(data: dict):
         conexion = conectar()
         cursor = conexion.cursor()
 
-        # 1. Insertar en tabla 'personas'
-        # NO incluimos ID_Personas aquí porque el Auto-incremento lo pondrá solo
-        sql_persona = """
-            INSERT INTO personas 
-            (Tipo, Nombre, Apellido, Edad, DUI, Telefono, Responsable_Nombre, Responsable_Telefono) 
-            VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
-        """
-        
-        valores_p = (
-            data.get('tipo_paciente'), 
-            data.get('nombre'),
-            data.get('apellido'),
-            data.get('edad'),
-            data.get('dui'),
-            data.get('telefono_responsable'), 
-            data.get('responsable'), 
-            data.get('telefono_responsable')
-        )
+        # Usamos nombres genéricos en las variables para evitar confusiones
+        nombre = data.get('nombre', 'Sin Nombre')
+        apellido = data.get('apellido', 'Sin Apellido')
+        tipo = data.get('tipo_paciente', 'Adulto')
+        edad = data.get('edad', '0')
+        dui = data.get('dui', '00000000-0')
+        tel = data.get('telefono', '0000-0000')
+        resp = data.get('responsable', 'N/A')
+        tel_resp = data.get('telefono_responsable', '0000-0000')
 
-        cursor.execute(sql_persona, valores_p)
+        # 1. Insertar en personas
+        sql_p = """INSERT INTO personas (Tipo, Nombre, Apellido, Edad, DUI, Telefono, Responsable_Nombre, Responsable_Telefono) 
+                   VALUES (%s, %s, %s, %s, %s, %s, %s, %s)"""
+        cursor.execute(sql_p, (tipo, nombre, apellido, edad, dui, tel, resp, tel_resp))
         
-        # Recuperamos el ID que MySQL acaba de generar automáticamente
-        id_persona_generado = cursor.lastrowid 
+        id_generado = cursor.lastrowid
 
-        # 2. Insertar en tabla 'fichas_medicas'
-        # Usamos el nombre exacto de tu columna: ID_Personas
-        sql_ficha = """
-            INSERT INTO fichas_medicas (ID_Personas, Tipo_Sangre, Alergias, Observaciones) 
-            VALUES (%s, %s, %s, %s)
-        """
+        # 2. Insertar en fichas_medicas (Asegúrate que la columna se llame ID_Persona o ID_Personas)
+        # Si el error persiste, cambia ID_Persona por ID_Personas abajo:
+        sql_f = """INSERT INTO fichas_medicas (ID_Persona, Tipo_Sangre, Alergias, Observaciones) 
+                   VALUES (%s, %s, %s, %s)"""
         
+        sangre = data.get('tipo_sangre', 'O+')
+        alergias = data.get('alergias', 'Ninguna')
         obs = f"Med: {data.get('medicamentos', '')} | Enf: {data.get('enfermedades', '')}"
-        
-        cursor.execute(sql_ficha, (
-            id_persona_generado, 
-            data.get('tipo_sangre', 'N/A'), 
-            data.get('alergias', 'Ninguna'), 
-            obs
-        ))
+
+        cursor.execute(sql_f, (id_generado, sangre, alergias, obs))
 
         conexion.commit()
-        return {"status": "ok", "id": id_persona_generado}
+        return {"status": "ok", "id": id_generado}
 
     except Exception as e:
         if conexion: conexion.rollback()
+        # Este print es clave: Revísalo en los logs de Render para ver el nombre exacto del error
+        print(f"DEBUG: {str(e)}") 
         return {"status": "error", "message": str(e)}
     finally:
         if conexion: conexion.close()
